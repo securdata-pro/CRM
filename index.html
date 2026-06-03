@@ -192,7 +192,7 @@ tbody tr{transition:.1s}tbody tr:hover{background:#faf9f5;cursor:pointer}
 .doc .meta div .lb{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#999}
 .doc .meta div .vv{font-weight:600;margin-top:2px}
 .doc table.it{width:100%;border-collapse:collapse;margin-top:8px}
-.doc table.it th{font-size:10.5px;color:#888;border-bottom:1px solid #ccc;padding:8px 12px}
+.doc table.it th{background:#f3f4f6;color:#3a3d44;font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:10px;border-top:1px solid #e3e5e9;border-bottom:1.5px solid #c4c7cd;padding:9px 12px}
 .doc table.it td{padding:11px 12px;border-bottom:1px solid #eee;font-size:12.5px}
 .doc table.it th.amt,.doc table.it td.amt{white-space:nowrap;text-align:right}
 .doc table.it .desc small{color:#888;display:block;margin-top:2px}
@@ -696,9 +696,9 @@ VIEWS.licenses=async(c)=>{const [lic,companies,products]=await Promise.all([stor
   }).join('')||'<tr><td colspan="10" class="empty">Nessuna licenza.</td></tr>'}</tbody></table></div>`;};
 
 VIEWS.products=async(c)=>{const products=await store.list('products');
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca prodotto, codice…','sProd')}<button class="btn ghost sm" onclick="importPriceList()">⭱ Importa listino PDF</button><span style="color:var(--muted);font-size:12.5px">${products.length} articoli</span></div>
-  <div class="card"><table><thead><tr><th>Codice</th><th>Articolo</th><th>Tipo</th><th class="num">Prezzo</th><th class="num">IVA</th><th class="num">Giacenza</th><th>Fornitore</th><th></th></tr></thead><tbody>${
-  products.map(p=>{const low=p.type==='Hardware'&&Number(p.stock)<=2;return `<tr data-s="${esc((p.code+' '+p.name+' '+p.type).toLowerCase())}" onclick="editProduct('${p.id}')"><td class="mono">${esc(p.code||'')}</td><td><b>${esc(p.name)}</b></td><td><span class="pill n">${esc(p.type)}</span></td><td class="num">${fmt(p.unit_price,p.currency)}</td><td class="num">${esc(p.vat)}%</td><td class="num">${p.type==='Hardware'?`<span class="${low?'pill r':''}">${esc(p.stock||0)}</span>`:'—'}</td><td>${esc(p.supplier||'—')}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('products','${p.id}')">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="8" class="empty">Nessun prodotto.</td></tr>'}</tbody></table></div>`;};
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca prodotto, codice…','sProd')}<button class="btn ghost sm" onclick="importPriceList()">⭱ Importa listino (PDF/Excel)</button><button id="prodBulkBtn" class="btn sm" style="display:none;background:var(--red);color:#fff;border-color:var(--red)" onclick="delSelectedProducts()">Elimina selezionati</button><span style="color:var(--muted);font-size:12.5px">${products.length} articoli</span></div>
+  <div class="card"><table><thead><tr><th style="width:34px"><input type="checkbox" title="Seleziona tutto" onclick="toggleAllProds(this)"></th><th>Codice</th><th>Articolo</th><th>Tipo</th><th class="num">Prezzo</th><th class="num">IVA</th><th class="num">Giacenza</th><th>Fornitore</th><th></th></tr></thead><tbody>${
+  products.map(p=>{const low=p.type==='Hardware'&&Number(p.stock)<=2;return `<tr data-s="${esc((p.code+' '+p.name+' '+p.type).toLowerCase())}" onclick="editProduct('${p.id}')"><td onclick="event.stopPropagation()"><input type="checkbox" class="psel" value="${p.id}" onclick="event.stopPropagation();updateProdBulk()"></td><td class="mono">${esc(p.code||'')}</td><td><b>${esc(p.name)}</b></td><td><span class="pill n">${esc(p.type)}</span></td><td class="num">${fmt(p.unit_price,p.currency)}</td><td class="num">${esc(p.vat)}%</td><td class="num">${p.type==='Hardware'?`<span class="${low?'pill r':''}">${esc(p.stock||0)}</span>`:'—'}</td><td>${esc(p.supplier||'—')}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('products','${p.id}')">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="9" class="empty">Nessun prodotto.</td></tr>'}</tbody></table></div>`;};
 
 /* ===== QUOTES (con azioni) ===== */
 VIEWS.quotes=async(c)=>{const [quotes,companies]=await Promise.all([store.list('quotes'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
@@ -862,6 +862,10 @@ async function delUser(id,email){
   if(!confirm('Eliminare il collaboratore '+(email||'')+'?'+extra))return;
   await store.remove('app_users',id);render();
 }
+function selectedProds(){return [...document.querySelectorAll('.psel:checked')].map(x=>x.value);}
+function updateProdBulk(){const n=selectedProds().length;const b=document.getElementById('prodBulkBtn');if(b){b.style.display=n?'inline-flex':'none';b.textContent='Elimina selezionati ('+n+')';}}
+function toggleAllProds(cb){document.querySelectorAll('.psel').forEach(x=>x.checked=cb.checked);updateProdBulk();}
+async function delSelectedProducts(){const ids=selectedProds();if(!ids.length)return;if(!confirm('Eliminare '+ids.length+' prodotti selezionati? L\'operazione non è reversibile.'))return;for(const id of ids){try{await store.remove('products',id);}catch(e){}}render();}
 async function refOptions(table,labelFn){const rows=await store.list(table);return rows.map(r=>({id:r.id,label:labelFn(r)}))}
 
 /* COMPANY */
@@ -1031,7 +1035,7 @@ async function editProduct(id){const s=await store.settings();const p=id?await s
 
 /* ===== IMPORT LISTINO PREZZI DA PDF ===== */
 let PARSED=[];
-function importPriceList(){PARSED=[];document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:980px"><div class="mhd"><h3>Importa listino prezzi da PDF</h3><button onclick="closeModal()">×</button></div><div class="mbd">
+function importPriceList(){PARSED=[];document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:980px"><div class="mhd"><h3>Importa listino prezzi (PDF o Excel)</h3><button onclick="closeModal()">×</button></div><div class="mbd">
   <div class="callout">Carica un PDF o un Excel di listino: il sistema legge il file ed estrae automaticamente i prodotti (codice, descrizione, prezzo, valuta). Per i PDF usa l'interpretazione AI quando l'app gira nell'ambiente Claude, altrimenti l'estrazione dal testo. Controlla e correggi l'anteprima prima di importare.</div>
   <div class="field"><label>File listino (PDF o Excel)</label><input id="imFile" type="file" accept=".pdf,.xlsx,.xls,application/pdf"></div>
   <div id="imStatus" style="font-size:13px;color:var(--muted)"></div>
