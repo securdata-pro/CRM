@@ -664,6 +664,8 @@ const COMP_COLS=[
  {id:'employees',label:'Dip.',num:true,cell:co=>esc(co.employees||'—')},
  {id:'num_sites',label:'Sedi',num:true,cell:co=>esc(co.num_sites||'—')},
  {id:'city',label:'Città',cell:co=>esc(co.city||'—')},
+ {id:'phone',label:'Telefono',cell:co=>esc(co.phone||'—')},
+ {id:'email',label:'Email',cell:co=>co.email?`<a href="mailto:${esc(co.email)}">${esc(co.email)}</a>`:'—'},
  {id:'country',label:'Paese',cell:co=>esc(co.country||'—')},
  {id:'revenue',label:'Fatturato',cell:co=>esc(co.revenue||'—')},
  {id:'infra',label:'Infrastruttura IT',cell:co=>[co.erp&&'ERP: '+co.erp,co.cloud&&'Cloud: '+co.cloud].filter(Boolean).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'—'},
@@ -674,7 +676,7 @@ const COMP_COLS=[
  {id:'backup',label:'Backup',cell:co=>esc(co.backup||'—')}
 ];
 function compColsKey(){return 'securgest_compcols_'+((CURRENT_USER&&CURRENT_USER.email)||'')}
-function getCompCols(){try{const v=JSON.parse(LS.get(compColsKey())||'null');if(Array.isArray(v)&&v.length)return v;}catch(e){}return ['types','vat_number','sector','employees','infra'];}
+function getCompCols(){try{const v=JSON.parse(LS.get(compColsKey())||'null');if(Array.isArray(v)&&v.length)return v;}catch(e){}return ['city','phone','email','types'];}
 function compColsCustomize(){const sel=getCompCols();openModal('Colonne elenco aziende',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Scegli quali colonne mostrare nell'elenco aziende (la colonna "Azienda" è sempre presente).</div><div class="checks" style="grid-template-columns:repeat(3,1fr)">${COMP_COLS.map(co=>`<label class="${sel.includes(co.id)?'on':''}"><input type="checkbox" class="ccol" value="${co.id}" ${sel.includes(co.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(co.label)}</label>`).join('')}</div>`,async()=>{const ids=[...document.querySelectorAll('.ccol:checked')].map(x=>x.value);LS.set(compColsKey(),JSON.stringify(ids));},{saveLabel:'Applica'});}
 VIEWS.companies=async(c)=>{const all=await store.list('companies');
   const companies=COMP_FILTER==='Tutti'?all:all.filter(co=>(co.types||[]).includes(COMP_FILTER));
@@ -893,6 +895,7 @@ function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgr
     <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
     <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
+    ${f('Telefono','co_phone',co.phone)}${f('Email','co_email',co.email,'email')}
     <div class="sec-title">Profilo aziendale</div>
     ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
@@ -901,7 +904,7 @@ function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgr
     ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
     ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
     ${f('Note','co_notes',co.notes,'textarea')}</div>`;}
-function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};}
+function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),phone:gv('co_phone'),email:gv('co_email'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};}
 async function editCompany(id){const co=id?await store.get('companies',id):{};
   const ctypes=co.types||[];
   let related='';
@@ -931,6 +934,7 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
     <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
+    ${f('Telefono','co_phone',co.phone)}${f('Email','co_email',co.email,'email')}
     <div class="sec-title">Profilo aziendale</div>
     ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
