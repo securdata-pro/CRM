@@ -1069,14 +1069,23 @@ async function editUser(id){const users=await store.list('app_users');const u=id
   const mods=u.modules||[];
   openModal(id?'Modifica collaboratore':'Nuovo collaboratore',`<div class="fgrid">
     ${f('Nome completo *','us_name',u.full_name)}${f('Reparto / ruolo','us_role',u.role,'select',ENUM.appRoles)}
-    ${f('Email di accesso *','us_email',u.email,'email')}${f('Password (solo demo)','us_pwd',u.pwd)}
-    ${MODE==='supabase'?`<div class="full callout">In modalità cloud la password di accesso è gestita da Supabase: dopo aver salvato questo profilo, crea (o invita) l'utente con la stessa email in <b>Supabase → Authentication → Users → Add user</b> (spunta "Auto Confirm User"). La password qui sopra serve solo alla modalità demo.</div>`:''}
+    ${f('Email di accesso *','us_email',u.email,'email')}${f('Password','us_pwd',u.pwd)}
+    ${MODE==='supabase'?`<div class="full callout">In modalità cloud, salvando un <b>nuovo</b> collaboratore l'app crea anche l'accesso in Supabase con questa email e password (almeno 6 caratteri). Perché l'utente possa entrare subito, in <b>Supabase → Authentication → Sign In / Providers → Email</b> disattiva <b>"Confirm email"</b>. Per cambiare la password di un utente esistente usa il link "Password dimenticata" o Supabase.</div>`:''}
     <div class="field full"><label>Tipo di accesso</label><label class="toggle"><input type="checkbox" id="us_super" ${u.is_superadmin?'checked':''} onchange="toggleSuper()"> <b>Superadmin</b> — pieni diritti su tutti i moduli</label></div>
     <div class="full" id="modWrap"><div class="sec-title" style="border:0;padding:0;margin:6px 0">Moduli visibili (per utente normale)</div>
       <div class="checks">${MODULES.map(m=>`<label class="${mods.includes(m.id)?'on':''}"><input type="checkbox" class="modchk" value="${m.id}" ${mods.includes(m.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(m.label)}</label>`).join('')}</div></div>
     ${f('Note','us_notes',u.notes,'textarea')}</div>`,async()=>{
-    const o={full_name:gv('us_name'),role:gv('us_role'),email:gv('us_email'),pwd:gv('us_pwd'),is_superadmin:gv('us_super'),modules:gv('us_super')?[]:[...document.querySelectorAll('.modchk:checked')].map(x=>x.value),notes:gv('us_notes')};
-    if(!o.full_name||!o.email)throw new Error('Nome ed email obbligatori');id?await store.update('app_users',id,o):await store.insert('app_users',o);});
+    const o={full_name:gv('us_name'),role:gv('us_role'),email:(gv('us_email')||'').trim().toLowerCase(),pwd:gv('us_pwd'),is_superadmin:gv('us_super'),modules:gv('us_super')?[]:[...document.querySelectorAll('.modchk:checked')].map(x=>x.value),notes:gv('us_notes')};
+    if(!o.full_name||!o.email)throw new Error('Nome ed email obbligatori');
+    if(MODE==='supabase'&&!id){
+      const pwd=gv('us_pwd');
+      if(!pwd||pwd.length<6)throw new Error('Imposta una password di almeno 6 caratteri per il nuovo accesso.');
+      const {data:sess}=await SB.auth.getSession();const adminSession=sess&&sess.session;
+      const {error:suErr}=await SB.auth.signUp({email:o.email,password:pwd});
+      if(adminSession){try{await SB.auth.setSession({access_token:adminSession.access_token,refresh_token:adminSession.refresh_token});}catch(e){}}
+      if(suErr&&!/already|registered|exists/i.test(suErr.message||'')){throw new Error('Creazione accesso non riuscita: '+suErr.message);}
+    }
+    id?await store.update('app_users',id,o):await store.insert('app_users',o);});
   toggleSuper();}
 function toggleSuper(){const on=gv('us_super');const w=document.getElementById('modWrap');if(w)w.style.display=on?'none':'';}
 
