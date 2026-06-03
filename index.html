@@ -810,6 +810,8 @@ VIEWS.settings=async(c)=>{
      <div class="field"><label>Sito web</label><input id="st_web" value="${esc(s.website)}"></div>
      <div class="field"><label>IVA predefinita (%)</label><input id="st_vat" type="number" step="0.1" value="${esc(s.default_vat)}"></div>
      <div class="field"><label>Valuta</label><select id="st_cur">${ENUM.currencies.map(o=>`<option ${o===s.currency?'selected':''}>${o}</option>`).join('')}</select></div>
+     <div class="field"><label>Cambio: 1 EUR = … CHF</label><input id="st_reur" type="number" step="0.0001" value="${esc(s.rate_eur||0.95)}"></div>
+     <div class="field"><label>Cambio: 1 USD = … CHF</label><input id="st_rusd" type="number" step="0.0001" value="${esc(s.rate_usd||0.88)}"></div>
      <div class="field full"><label>Email per richieste reset password</label><input id="st_reset" value="${esc(s.reset_email||s.email||'')}"><div style="font-size:11.5px;color:var(--muted);margin-top:4px">Le richieste “Password dimenticata” vengono inviate a questo indirizzo.</div></div>
    </div></div></div>
    <div class="card"><div class="hd"><h3>Collaboratori & accessi</h3><div class="spacer"></div>${isSuper()?'<button class="btn sm" onclick="editUser()">+ Utente</button>':''}</div>
@@ -820,7 +822,7 @@ VIEWS.settings=async(c)=>{
     ${MODE==='demo'?'<button class="btn ghost sm" onclick="resetDemo()">↺ Ripristina dati demo</button>':''}
     <span style="color:var(--muted);font-size:12.5px">Modalità: <b>${MODE==='demo'?'demo locale (browser)':'Supabase (cloud)'}</b></span>
   </div></div>`;};
-async function saveCompanyData(){await store.saveSettings({name:val('st_name'),address:val('st_address'),zip_city:val('st_zip'),country:val('st_country'),tax_id:val('st_tax'),phone:val('st_phone'),email:val('st_email'),website:val('st_web'),default_vat:parseFloat(val('st_vat'))||0,currency:val('st_cur'),reset_email:val('st_reset')});CUR=val('st_cur')||'CHF';toast('Dati azienda salvati');}
+async function saveCompanyData(){await store.saveSettings({name:val('st_name'),address:val('st_address'),zip_city:val('st_zip'),country:val('st_country'),tax_id:val('st_tax'),phone:val('st_phone'),email:val('st_email'),website:val('st_web'),default_vat:parseFloat(val('st_vat'))||0,currency:val('st_cur'),reset_email:val('st_reset'),rate_eur:parseFloat(val('st_reur'))||0.95,rate_usd:parseFloat(val('st_rusd'))||0.88});CUR=val('st_cur')||'CHF';toast('Dati azienda salvati');}
 function val(id){const e=document.getElementById(id);return e?e.value:''}
 
 /* ===== form engine ===== */
@@ -1155,7 +1157,11 @@ async function docForm(kind,id){
     if(!o[partyField])throw new Error(cfg.partyLabel+' obbligatorio');id?await store.update(cfg.table,id,o):await store.insert(cfg.table,o);
   },{wide:true,saveLabel:'Salva documento'});
   CUR=doc.currency||s.currency||'CHF';
-  const curEl=document.getElementById('dc_cur');if(curEl)curEl.addEventListener('change',()=>{CUR=curEl.value;recalc();});
+  let DOC_CUR=CUR;const RATES={CHF:1,EUR:Number(s.rate_eur)||0.95,USD:Number(s.rate_usd)||0.88};
+  const curEl=document.getElementById('dc_cur');
+  if(curEl)curEl.addEventListener('change',()=>{const oldC=DOC_CUR,newC=curEl.value;
+    if(oldC!==newC){const fct=(RATES[oldC]||1)/(RATES[newC]||1);document.querySelectorAll('#lineRows .ln-price').forEach(inp=>{const v=parseFloat(inp.value)||0;inp.value=Math.round(v*fct*100)/100;});}
+    DOC_CUR=newC;CUR=newC;recalc();});
   renderLines();}
 async function newPartyCompany(isSupplier){
   const name=prompt('Ragione sociale della nuova azienda:');if(!name||!name.trim())return;
