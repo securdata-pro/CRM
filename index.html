@@ -364,7 +364,7 @@ const MODULES=[
   {id:'sales_orders',label:'Ordini cliente'},
   {id:'purchase_orders',label:'Ordini a Fornitore'},{id:'licenses',label:'Licenze & Canoni'},
   {id:'products',label:'Prodotti & Magazzino'},{id:'quotes',label:'Preventivi'},
-  {id:'invoices',label:'Fatture'},{id:'documents',label:'Documenti'},{id:'banks',label:'Banche'},{id:'settings',label:'Impostazioni'}
+  {id:'invoices',label:'Fatture'},{id:'proformas',label:'Proforma'},{id:'documents',label:'Documenti'},{id:'banks',label:'Banche'},{id:'settings',label:'Impostazioni'}
 ];
 
 /* ===== store interface ===== */
@@ -447,7 +447,7 @@ function DemoStore(){
       ]
     };
   }
-  const cols=['settings','app_users','companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','documents','banks','access_logs','campaigns'];
+  const cols=['settings','app_users','companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','documents','banks','access_logs','campaigns'];
   const norm=t=>cols.includes(t)?t:null;
   return {
     mode:'demo',
@@ -527,6 +527,7 @@ const PAGES=[
   {grp:'Documenti'},
   {id:'quotes',icon:'🧾',label:'Preventivi'},
   {id:'invoices',icon:'💶',label:'Fatture'},
+  {id:'proformas',icon:'🧾',label:'Proforma'},
   {id:'documents',icon:'📎',label:'Documenti'},
   {grp:'Sistema'},
   {id:'banks',icon:'🏦',label:'Banche'},
@@ -543,13 +544,13 @@ function buildNav(){let h='';let pending=null;
 function go(id){if(!can(id)){id='dashboard'}PAGE=id;buildNav();render();}
 
 /* ===== router ===== */
-const TITLES={dashboard:'Dashboard',leads:'Lead & Opportunità',pipeline:'Pipeline commerciale',companies:'Aziende',contacts:'Contatti',marketing:'Marketing',sales_orders:'Ordini cliente',purchase_orders:'Ordini a Fornitore',licenses:'Licenze & Canoni',products:'Prodotti & Magazzino',quotes:'Preventivi',invoices:'Fatture',documents:'Documenti',banks:'Banche',settings:'Impostazioni',access_logs:'Log accessi'};
+const TITLES={dashboard:'Dashboard',leads:'Lead & Opportunità',pipeline:'Pipeline commerciale',companies:'Aziende',contacts:'Contatti',marketing:'Marketing',sales_orders:'Ordini cliente',purchase_orders:'Ordini a Fornitore',licenses:'Licenze & Canoni',products:'Prodotti & Magazzino',quotes:'Preventivi',invoices:'Fatture',proformas:'Proforma',documents:'Documenti',banks:'Banche',settings:'Impostazioni',access_logs:'Log accessi'};
 async function render(){
   if(!can(PAGE))PAGE='dashboard';
   document.getElementById('pageTitle').textContent=TITLES[PAGE]||'';
   const add=document.getElementById('primaryAdd');
-  const addMap={leads:editLead,companies:editCompany,contacts:editContact,marketing:editCampaign,licenses:editLicense,products:editProduct,quotes:editQuote,invoices:editInvoice,sales_orders:editSalesOrder,purchase_orders:editPurchaseOrder,documents:editDocument,banks:editBank};
-  const lbl={leads:'+ Nuovo lead',companies:'+ Nuova azienda',contacts:'+ Nuovo contatto',marketing:'+ Nuova campagna',partners:'+ Nuovo partner',licenses:'+ Nuova licenza',products:'+ Nuovo prodotto',quotes:'+ Nuovo preventivo',invoices:'+ Nuova fattura',sales_orders:'+ Nuovo ordine',purchase_orders:'+ Nuovo ordine',documents:'+ Carica documento',banks:'+ Nuovo conto'};
+  const addMap={leads:editLead,companies:editCompany,contacts:editContact,marketing:editCampaign,licenses:editLicense,products:editProduct,quotes:editQuote,invoices:editInvoice,sales_orders:editSalesOrder,purchase_orders:editPurchaseOrder,proformas:editProforma,documents:editDocument,banks:editBank};
+  const lbl={leads:'+ Nuovo lead',companies:'+ Nuova azienda',contacts:'+ Nuovo contatto',marketing:'+ Nuova campagna',partners:'+ Nuovo partner',licenses:'+ Nuova licenza',products:'+ Nuovo prodotto',quotes:'+ Nuovo preventivo',invoices:'+ Nuova fattura',sales_orders:'+ Nuovo ordine',purchase_orders:'+ Nuovo ordine',proformas:'+ Nuova proforma',documents:'+ Carica documento',banks:'+ Nuovo conto'};
   if(addMap[PAGE]&&PAGE!=='contacts'&&PAGE!=='companies'){add.style.display='';add.onclick=()=>addMap[PAGE]();add.textContent=lbl[PAGE];}else add.style.display='none';
   const c=document.getElementById('content');c.innerHTML='<div class="empty">Caricamento…</div>';
   try{ await VIEWS[PAGE](c); }catch(e){ c.innerHTML='<div class="callout">Errore: '+esc(e.message||e)+'</div>'; console.error(e);}
@@ -730,6 +731,18 @@ VIEWS.quotes=async(c)=>{const [quotes,companies]=await Promise.all([store.list('
       <button class="iconbtn" title="Stampa/PDF" onclick="event.stopPropagation();printDoc('quote','${q.id}')">🖨</button>
       <button class="iconbtn" onclick="event.stopPropagation();delRow('quotes','${q.id}')">🗑</button></td></tr>`;
   }).join('')||'<tr><td colspan="7" class="empty">Nessun preventivo.</td></tr>'}</tbody></table></div>`;};
+
+VIEWS.proformas=async(c)=>{const [rows,companies]=await Promise.all([store.list('proformas'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca proforma…','sPF')}<span style="color:var(--muted);font-size:12.5px">${rows.length} proforme</span></div>
+  <div class="card"><table><thead><tr><th>Numero</th><th>Cliente</th><th>Data</th><th>Validità</th><th class="num">Totale</th><th>Stato</th><th></th></tr></thead><tbody>${
+  rows.map(q=>{const t=docTotals(q);const stc=q.status==='Accettato'?'g':q.status==='Rifiutato'?'r':q.status==='Inviato'?'b':'n';
+    return `<tr data-s="${esc((q.number+' '+(comp[q.company]||{}).name).toLowerCase())}" onclick="editProforma('${q.id}')"><td class="mono"><b>${esc(q.number)}</b></td><td>${esc((comp[q.company]||{}).name||'—')}</td><td>${dateIt(q.date)}</td><td>${dateIt(q.expiry)}</td><td class="num">${money(t.total)}</td><td><span class="pill ${stc}">${esc(q.status)}</span></td><td class="rowact">
+      <button class="iconbtn" title="Invia per email" onclick="event.stopPropagation();sendDoc('proforma','${q.id}')">✉</button>
+      <button class="iconbtn" title="Converti in fattura" onclick="event.stopPropagation();convertToInvoice('${q.id}','proforma')">⇒</button>
+      <button class="iconbtn" title="Duplica" onclick="event.stopPropagation();duplicateDoc('proformas','${q.id}','proforma')">⧉</button>
+      <button class="iconbtn" title="Stampa/PDF" onclick="event.stopPropagation();printDoc('proforma','${q.id}')">🖨</button>
+      <button class="iconbtn" onclick="event.stopPropagation();delRow('proformas','${q.id}')">🗑</button></td></tr>`;
+  }).join('')||'<tr><td colspan="7" class="empty">Nessuna proforma.</td></tr>'}</tbody></table></div>`;};
 
 /* ===== INVOICES ===== */
 VIEWS.invoices=async(c)=>{const [inv,companies]=await Promise.all([store.list('invoices'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
@@ -1178,7 +1191,8 @@ const DOC_CFG={
   quote:{table:'quotes',prefixKey:'quote_prefix',defPrefix:'S',title:'PREVENTIVO',label:'preventivo',party:'company',statuses:ENUM.docStatus,expLabel:'Scadenza preventivo',partyLabel:'Cliente'},
   invoice:{table:'invoices',prefixKey:'invoice_prefix',defPrefix:'F',title:'FATTURA',label:'fattura',party:'company',statuses:ENUM.invStatus,expLabel:'Scadenza pagamento',partyLabel:'Cliente'},
   sales_order:{table:'sales_orders',prefixKey:'so_prefix',defPrefix:'OC',title:'ORDINE CLIENTE',label:'ordine cliente',party:'company',statuses:ENUM.orderStatus,expLabel:'Consegna prevista',partyLabel:'Cliente'},
-  purchase_order:{table:'purchase_orders',prefixKey:'po_prefix',defPrefix:'OF',title:'ORDINE FORNITORE',label:'ordine fornitore',supplier:true,statuses:ENUM.poStatus,expLabel:'Consegna prevista',partyLabel:'Fornitore'}
+  purchase_order:{table:'purchase_orders',prefixKey:'po_prefix',defPrefix:'OF',title:'ORDINE FORNITORE',label:'ordine fornitore',supplier:true,statuses:ENUM.poStatus,expLabel:'Consegna prevista',partyLabel:'Fornitore'},
+  proforma:{table:'proformas',prefixKey:'pf_prefix',defPrefix:'PF',title:'FATTURA PROFORMA',label:'proforma',party:'company',statuses:ENUM.docStatus,expLabel:'Validità offerta',partyLabel:'Cliente'}
 };
 let LINE_BUF=[];let DOC_PRODS=[];
 function prodDatalists(){return `<datalist id="dlCodes">${DOC_PRODS.filter(p=>p.code).map(p=>`<option value="${esc(p.code)}">${esc(p.name)}</option>`).join('')}</datalist><datalist id="dlNames">${DOC_PRODS.map(p=>`<option value="${esc(p.name)}">${esc(p.code||'')}</option>`).join('')}</datalist><datalist id="vatPresets"><option value="0"></option><option value="8.1"></option><option value="22"></option></datalist>`;}
@@ -1187,8 +1201,9 @@ function editQuote(id){return docForm('quote',id)}
 function editInvoice(id){return docForm('invoice',id)}
 function editSalesOrder(id){return docForm('sales_order',id)}
 function editPurchaseOrder(id){return docForm('purchase_order',id)}
-const KIND_PAGE={quote:'quotes',invoice:'invoices',sales_order:'sales_orders',purchase_order:'purchase_orders'};
-const KIND_LABELS=[['quote','Preventivo'],['invoice','Fattura'],['sales_order','Ordine cliente'],['purchase_order','Ordine a fornitore']];
+function editProforma(id){return docForm('proforma',id)}
+const KIND_PAGE={quote:'quotes',invoice:'invoices',sales_order:'sales_orders',purchase_order:'purchase_orders',proforma:'proformas'};
+const KIND_LABELS=[['quote','Preventivo'],['invoice','Fattura'],['sales_order','Ordine cliente'],['purchase_order','Ordine a fornitore'],['proforma','Fattura proforma']];
 let DOC_EDIT=null;
 async function docForm(kind,id){
   const cfg=DOC_CFG[kind];const s=await store.settings();CUR=s.currency||'CHF';
@@ -1291,14 +1306,14 @@ function recalc(){const rows=[...document.querySelectorAll('#lineRows tr')];let 
 async function nextNumber(kind){const cfg=DOC_CFG[kind];const s=await store.settings();const pref=s[cfg.prefixKey]||cfg.defPrefix;const rows=await store.list(cfg.table);let max=0;rows.forEach(r=>{const m=(''+r.number).match(/(\d+)/);if(m)max=Math.max(max,parseInt(m[1]))});return pref+String(max+1).padStart(5,'0');}
 
 /* ===== convert / duplicate / send ===== */
-async function convertToInvoice(quoteId){const q=await store.get('quotes',quoteId);if(!q)return;if(!confirm('Creare una fattura da questo preventivo?'))return;
+async function convertToInvoice(srcId,srcKind='quote'){const scfg=DOC_CFG[srcKind];const q=await store.get(scfg.table,srcId);if(!q)return;if(!confirm('Creare una fattura da questo documento?'))return;
   const inv={number:await nextNumber('invoice'),company:q.company,contact:q.contact,commercial_ref:q.commercial_ref,date:todayISO(),expiry:addDays(todayISO(),30),currency:q.currency,status:'Bozza',payment_terms:q.payment_terms,notes:q.notes,lines:JSON.parse(JSON.stringify(q.lines||[])),quote_id:q.id,documents:q.documents||[]};
-  await store.insert('invoices',inv);await store.update('quotes',quoteId,{status:'Accettato'});toast('Fattura '+inv.number+' creata');go('invoices');}
+  await store.insert('invoices',inv);try{await store.update(scfg.table,srcId,{status:'Accettato'});}catch(e){}toast('Fattura '+inv.number+' creata');go('invoices');}
 async function duplicateDoc(table,id,kind){const d=await store.get(table,id);if(!d)return;const copy=JSON.parse(JSON.stringify(d));delete copy.id;delete copy.created_at;copy.number=await nextNumber(kind);copy.date=todayISO();copy.status=DOC_CFG[kind].statuses[0];await store.insert(table,copy);toast('Duplicato come '+copy.number);render();}
 async function sendDoc(kind,id){const cfg=DOC_CFG[kind];const doc=await store.get(cfg.table,id);const s=await store.settings();CUR=doc.currency||s.currency||'CHF';
   const companies=await store.list('companies');const contacts=await store.list('contacts');const co=companies.find(x=>x.id===doc.company)||{};const ct=contacts.find(x=>x.id===doc.contact);
   const to=(ct&&ct.email)||co.email||'';const t=docTotals(doc);
-  const subject=`${cfg.title==='FATTURA'?'Fattura':'Preventivo'} ${doc.number} — ${s.name}`;
+  const subject=`${cfg.label.charAt(0).toUpperCase()+cfg.label.slice(1)} ${doc.number} — ${s.name}`;
   const body=`Gentile ${ct?ct.first_name+' '+ct.last_name:co.name||'Cliente'},\n\nin allegato trova ${cfg.label} N. ${doc.number} del ${dateIt(doc.date)} per un totale di ${money(t.total)} (IVA inclusa).\n\n${doc.notes?doc.notes+'\n\n':''}Cordiali saluti,\n${doc.commercial_ref||s.name}\n${s.name} · ${s.phone} · ${s.email}`;
   openModal('Invia '+cfg.label+' per email',`<div class="fgrid">
     ${f('Destinatario','sd_to',to,'email')}<div></div>
