@@ -429,14 +429,15 @@ function DemoStore(){
   };
 }
 function SupabaseStore(client){
+  const clean=o=>{const r={};for(const k in o){r[k]=(o[k]==='')?null:o[k];}return r;};
   return {
     mode:'supabase',
     async settings(){const {data}=await client.from('settings').select('*').eq('id',1).maybeSingle();return data||{};},
-    async saveSettings(s){const {data}=await client.from('settings').upsert({id:1,...s}).select().single();return data;},
+    async saveSettings(s){const {data}=await client.from('settings').upsert({id:1,...clean(s)}).select().single();return data;},
     async list(t){const {data,error}=await client.from(t).select('*').order('created_at',{ascending:false});if(error)throw error;return data||[];},
     async get(t,id){const {data}=await client.from(t).select('*').eq('id',id).maybeSingle();return data;},
-    async insert(t,o){const {data,error}=await client.from(t).insert(o).select().single();if(error)throw error;return data;},
-    async update(t,id,o){const {data,error}=await client.from(t).update(o).eq('id',id).select().single();if(error)throw error;return data;},
+    async insert(t,o){const {data,error}=await client.from(t).insert(clean(o)).select().single();if(error)throw error;return data;},
+    async update(t,id,o){const {data,error}=await client.from(t).update(clean(o)).eq('id',id).select().single();if(error)throw error;return data;},
     async remove(t,id){const {error}=await client.from(t).delete().eq('id',id);if(error)throw error;}
   };
 }
@@ -865,14 +866,14 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     ${f('Indirizzo','co_addr',co.address)}${f('CAP','co_zip',co.zip)}
     ${f('Città','co_city',co.city)}${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     <div class="sec-title">Profilo aziendale</div>
-    ${f('N. dipendenti','co_emp',co.employees,'number')}${f('Fatturato','co_rev',co.revenue)}
-    ${f('Gruppo societario','co_grp',co.group_name)}${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}
-    ${f('N. sedi','co_sites',co.num_sites,'number')}<div></div>
+    ${f('Settore','co_sector',co.sector)}${f('N. dipendenti','co_emp',co.employees,'number')}
+    ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
+    ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
     <div class="sec-title">Infrastruttura IT attuale</div>
     ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
     ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
     ${f('Note','co_notes',co.notes,'textarea')}</div>${related}`,async()=>{
-    const o={name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};
+    const o={name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};
     if(!o.name)throw new Error('Ragione sociale obbligatoria');id?await store.update('companies',id,o):await store.insert('companies',o);},{wide:true});}
 
 /* ===== SCHEDA SITUAZIONE CLIENTE ===== */
