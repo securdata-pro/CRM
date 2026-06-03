@@ -1478,8 +1478,7 @@ async function boot(){const s=await store.settings();CUR=(s&&s.currency)||'CHF';
   document.getElementById('whoName').textContent=CURRENT_USER.full_name;document.getElementById('whoRole').textContent=CURRENT_USER.is_superadmin?'Superadmin':CURRENT_USER.role;
   document.getElementById('whoAv').textContent=(CURRENT_USER.full_name||'U').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
   applyTheme(CURRENT_USER.theme||LS.get('securgest_theme')||'rosso');applySide(CURRENT_USER.side_theme||LS.get('securgest_side')||'scuro');renderSwatches();
-  PAGE='dashboard';buildNav();render();
-  if(!CURRENT_USER.twofa)setTimeout(twofaReminder,400);}
+  PAGE='dashboard';buildNav();render();}
 function twofaReminder(){document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="max-width:470px"><div class="mhd"><h3>🔒 Proteggi il tuo account</h3><button onclick="closeModal()">×</button></div><div class="mbd"><p style="margin:0 0 10px">Per maggiore sicurezza ti consigliamo di attivare la <b>verifica in due passaggi (2FA)</b>.</p><div class="callout">Finché non la attivi, questo avviso comparirà a ogni accesso. Bastano pochi secondi con un'app come Google Authenticator o Microsoft Authenticator.</div></div><div class="mft"><button class="btn ghost" onclick="closeModal()">Più tardi</button><button class="btn red" onclick="closeModal();security2FA()">Attiva ora</button></div></div></div>`;}
 async function logout(){try{if(MODE==='supabase'&&SB)await SB.auth.signOut();}catch(e){}LS.del('securgest_mode');LS.del('securgest_user');location.reload();}
 async function resetDemo(){if(!confirm('Ripristinare i dati demo iniziali?'))return;await store.reset();render();toast('Dati demo ripristinati');}
