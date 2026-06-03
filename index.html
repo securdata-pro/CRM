@@ -77,7 +77,10 @@ h1,h2,h3,h4{font-family:var(--disp);font-weight:700;letter-spacing:-.01em;margin
 .side .who .meta{flex:1;min-width:0}
 .side .who .meta b{color:#fff;display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side .who .meta span{color:var(--side-muted)}
-.side .who button{background:none;border:0;color:var(--side-muted);font-size:16px}
+.side .who button{background:#262932;border:0;color:#fff;font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;font-weight:600}
+.side .who button:hover{background:var(--red)}
+.del-btn{background:#fff;border:1px solid #e7b3b3;color:var(--red);font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer;font-weight:600}
+.del-btn:hover{background:var(--red);color:#fff;border-color:var(--red)}
 
 .main{min-width:0;display:flex;flex-direction:column}
 .topbar{display:flex;align-items:center;gap:14px;padding:14px 26px;border-bottom:1px solid var(--line);background:rgba(244,243,239,.85);backdrop-filter:blur(8px);position:sticky;top:0;z-index:20}
@@ -266,7 +269,7 @@ tbody tr{transition:.1s}tbody tr:hover{background:#faf9f5;cursor:pointer}
       <div class="who">
         <div class="av" id="whoAv">SD</div>
         <div class="meta"><b id="whoName">Demo</b><span id="whoRole">Admin</span></div>
-        <button title="Esci" onclick="logout()">⎋</button>
+        <button title="Esci dal gestionale" onclick="logout()">⎋ Esci</button>
       </div>
     </aside>
     <div class="main">
@@ -810,7 +813,7 @@ VIEWS.settings=async(c)=>{
      <div class="field full"><label>Email per richieste reset password</label><input id="st_reset" value="${esc(s.reset_email||s.email||'')}"><div style="font-size:11.5px;color:var(--muted);margin-top:4px">Le richieste “Password dimenticata” vengono inviate a questo indirizzo.</div></div>
    </div></div></div>
    <div class="card"><div class="hd"><h3>Collaboratori & accessi</h3><div class="spacer"></div>${isSuper()?'<button class="btn sm" onclick="editUser()">+ Utente</button>':''}</div>
-   <div class="bd">${isSuper()?`<table><tbody>${users.map(u=>`<tr onclick="editUser('${u.id}')"><td><b>${esc(u.full_name)}</b><br><span style="color:var(--muted);font-size:12px">${esc(u.email)}</span></td><td>${u.is_superadmin?'<span class="pill r">Superadmin</span>':`<span class="pill n">${esc(u.role)}</span>`}</td><td style="font-size:11px;color:var(--muted)">${u.is_superadmin?'tutti i moduli':(u.modules||[]).length+' moduli'}</td><td>${u.twofa?'<span class="pill g">2FA attiva</span>':'<span class="pill r">2FA non attiva</span>'}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('app_users','${u.id}')">🗑</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Solo un superadmin può gestire gli utenti.</div>'}</div></div>
+   <div class="bd">${isSuper()?`<table><tbody>${users.map(u=>`<tr onclick="editUser('${u.id}')"><td><b>${esc(u.full_name)}</b><br><span style="color:var(--muted);font-size:12px">${esc(u.email)}</span></td><td>${u.is_superadmin?'<span class="pill r">Superadmin</span>':`<span class="pill n">${esc(u.role)}</span>`}</td><td style="font-size:11px;color:var(--muted)">${u.is_superadmin?'tutti i moduli':(u.modules||[]).length+' moduli'}</td><td>${u.twofa?'<span class="pill g">2FA attiva</span>':'<span class="pill r">2FA non attiva</span>'}</td><td class="rowact"><button class="del-btn" onclick="event.stopPropagation();delUser('${u.id}','${esc(u.email)}')">Elimina</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Solo un superadmin può gestire gli utenti.</div>'}</div></div>
   </div>
   <div class="card" style="margin-top:18px"><div class="hd"><h3>Dati & backup</h3></div><div class="bd" style="padding:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <button class="btn ghost sm" onclick="exportData()">⭳ Esporta tutto (JSON)</button>
@@ -833,6 +836,12 @@ function f(label,id,value,type='text',opts){value=value==null?'':value;
   return `<div class="field"><label>${label}</label><input id="${id}" type="${type}" value="${esc(value)}"></div>`;}
 function gv(id){const e=document.getElementById(id);if(!e)return '';return e.type==='checkbox'?e.checked:e.value}
 async function delRow(table,id){if(!confirm('Eliminare questo elemento?'))return;await store.remove(table,id);render();}
+async function delUser(id,email){
+  if(CURRENT_USER&&id===CURRENT_USER.id){alert('Non puoi eliminare il tuo stesso account mentre sei collegato.');return;}
+  const extra=MODE==='supabase'?'\n\nNota: viene rimosso il profilo e i permessi. Per togliere anche l\'accesso (login), elimina l\'utente anche in Supabase → Authentication → Users.':'';
+  if(!confirm('Eliminare il collaboratore '+(email||'')+'?'+extra))return;
+  await store.remove('app_users',id);render();
+}
 async function refOptions(table,labelFn){const rows=await store.list(table);return rows.map(r=>({id:r.id,label:labelFn(r)}))}
 
 /* COMPANY */
@@ -1126,7 +1135,7 @@ async function docForm(kind,id){
   const users=await store.list('app_users');const allDocs=await store.list('documents');const banks=await store.list('banks');const prods=await store.list('products');DOC_PRODS=prods;
   const attached=doc.documents||[];const showBank=kind!=='purchase_order';
   openModal(id?`Modifica ${cfg.label}`:`Nuovo ${cfg.label}`,`<div class="fgrid">
-    ${f('Numero','dc_num',doc.number)}${f(cfg.partyLabel+' *','dc_party',doc[partyField],'ref',partyOpts)}
+    ${f('Numero','dc_num',doc.number)}<div class="field"><label>${esc(cfg.partyLabel)} *</label><div style="display:flex;gap:6px;align-items:center"><select id="dc_party" style="flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff"><option value="">—</option>${partyOpts.map(o=>`<option value="${o.id}" ${o.id===doc[partyField]?'selected':''}>${esc(o.label)}</option>`).join('')}</select><button class="btn ghost sm" type="button" onclick="newPartyCompany(${cfg.supplier?'true':'false'})">+ Nuova</button></div></div>
     ${!cfg.supplier?f('Riferimento cliente (contatto)','dc_ct',doc.contact,'ref',conOpts):'<div></div>'}
     <div class="field"><label>Riferimento commerciale</label><select id="dc_ref"><option value="">—</option>${users.map(u=>`<option ${u.full_name===doc.commercial_ref?'selected':''}>${esc(u.full_name)}</option>`).join('')}</select></div>
     ${f('Data','dc_date',doc.date,'date')}${f(cfg.expLabel,'dc_exp',doc.expiry,'date')}
@@ -1145,7 +1154,16 @@ async function docForm(kind,id){
     o[partyField]=gv('dc_party');if(kind==='quote')o.documents=[...document.querySelectorAll('.atchk:checked')].map(x=>x.value);
     if(!o[partyField])throw new Error(cfg.partyLabel+' obbligatorio');id?await store.update(cfg.table,id,o):await store.insert(cfg.table,o);
   },{wide:true,saveLabel:'Salva documento'});
+  CUR=doc.currency||s.currency||'CHF';
+  const curEl=document.getElementById('dc_cur');if(curEl)curEl.addEventListener('change',()=>{CUR=curEl.value;recalc();});
   renderLines();}
+async function newPartyCompany(isSupplier){
+  const name=prompt('Ragione sociale della nuova azienda:');if(!name||!name.trim())return;
+  const city=(prompt('Città (facoltativo):')||'').trim();
+  try{const co=await store.insert('companies',{name:name.trim(),types:[isSupplier?'Fornitore':'Cliente'],city});
+    const sel=document.getElementById('dc_party');if(sel){const o=document.createElement('option');o.value=co.id;o.textContent=co.name;sel.appendChild(o);sel.value=co.id;}
+    toast('Azienda creata e selezionata. Potrai completarne i dettagli nella sezione Aziende.');
+  }catch(e){alert('Errore nella creazione: '+(e.message||e));}}
 function addLine(vat){LINE_BUF.push({code:'',desc:'',qty:1,price:0,vat:vat||0});renderLines();}
 async function addFromCatalog(pid){if(!pid)return;collectLines();const p=await store.get('products',pid);if(p){if(LINE_BUF.length===1&&!LINE_BUF[0].desc&&!LINE_BUF[0].price)LINE_BUF=[];LINE_BUF.push({code:p.code||'',desc:p.name||'',qty:1,price:Number(p.unit_price)||0,vat:Number(p.vat)||0});renderLines();}}
 function collectLines(){LINE_BUF=[...document.querySelectorAll('#lineRows tr')].map(tr=>({code:tr.querySelector('.ln-code').value,desc:tr.querySelector('.ln-desc').value,qty:parseFloat(tr.querySelector('.ln-qty').value)||0,price:parseFloat(tr.querySelector('.ln-price').value)||0,vat:parseFloat(tr.querySelector('.ln-vat').value)||0,disc:parseFloat(tr.querySelector('.ln-disc').value)||0}));}
