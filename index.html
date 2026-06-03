@@ -330,6 +330,7 @@ const ENUM={
   canone:['Annuale','Triennale','Quinquennale'], canoneYears:{'Annuale':1,'Triennale':3,'Quinquennale':5},
   prodType:['Hardware','Software','Licenza','Servizio'],
   appRoles:['Direzione','Commerciale','Tecnico','HR','Grafica'],
+  roleTitles:['CEO','Owner','Direttore generale','CFO','CIO / Direttore IT','Direttore commerciale','Direttore tecnico','Responsabile acquisti / Buyer','Responsabile IT','Commerciale','Tecnico','Impiegato','Consulente','Altro'],
   countries:['Svizzera','Italia','Germania','Francia','Austria','Liechtenstein','Spagna','Portogallo','Paesi Bassi','Belgio','Lussemburgo','Regno Unito','Irlanda','Danimarca','Svezia','Norvegia','Finlandia','Polonia','Repubblica Ceca','Slovacchia','Slovenia','Croazia','Ungheria','Romania','Bulgaria','Grecia','Stati Uniti','Canada','Emirati Arabi Uniti','Altro'],
   currencies:['CHF','EUR','USD'],
   partnerTypes:['Vendor / Produttore','Distributore','Rivenditore','System Integrator','Segnalatore','Altro'],
@@ -670,12 +671,12 @@ VIEWS.companies=async(c)=>{const all=await store.list('companies');
 
 const CON_COLS=[
  {id:'company',label:'Azienda',cell:(p,comp)=>esc((comp[p.company]||{}).name||'—')},
- {id:'role',label:'Ruolo',cell:p=>`${esc(p.role_title||'—')}<br><span style="color:var(--muted);font-size:11.5px">${esc(p.role_cat||'')}</span>`},
- {id:'role_cat',label:'Categoria',cell:p=>esc(p.role_cat||'—')},
+ {id:'role',label:'Ruolo',cell:p=>esc(p.role_title||'—')},
  {id:'authority',label:'Potere decisionale',cell:p=>`<span class="pill ${p.authority==='Decision maker'?'g':'n'}">${esc(p.authority||'—')}</span>`},
  {id:'email',label:'Email',cell:p=>esc(p.email||'—')},
- {id:'phone',label:'Telefono',cell:p=>esc(p.phone||'—')},
- {id:'contact',label:'Contatti',cell:p=>`<span style="font-size:12.5px">${esc(p.email||'')}<br>${esc(p.phone||'')}</span>`}
+ {id:'phone',label:'Tel. Ufficio',cell:p=>esc(p.phone||'—')},
+ {id:'mobile',label:'Mobile',cell:p=>esc(p.mobile||'—')},
+ {id:'contact',label:'Contatti',cell:p=>`<span style="font-size:12.5px">${esc(p.email||'')}<br>${esc(p.mobile||p.phone||'')}</span>`}
 ];
 function conColsKey(){return 'securgest_concols_'+((CURRENT_USER&&CURRENT_USER.email)||'')}
 function getConCols(){try{const v=JSON.parse(LS.get(conColsKey())||'null');if(Array.isArray(v)&&v.length)return v;}catch(e){}return ['company','role','authority','contact'];}
@@ -964,17 +965,16 @@ async function printStatement(id){
   document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';closeModal();}
 
 /* CONTACT */
-async function editContact(id){const p=id?await store.get('contacts',id):{};const comps=await refOptions('companies',r=>r.name);const cat=p.role_cat||'Decision Maker';
+async function editContact(id){const p=id?await store.get('contacts',id):{};const comps=await refOptions('companies',r=>r.name);
   openModal(id?'Modifica contatto':'Nuovo contatto',`<div class="fgrid">
     ${f('Nome *','ct_fn',p.first_name)}${f('Cognome *','ct_ln',p.last_name)}${f('Azienda','ct_co',p.company,'ref',comps)}
-    <div class="field"><label>Categoria ruolo</label><select id="ct_cat" onchange="syncRoleTitles()">${Object.keys(ENUM.roleCats).map(k=>`<option ${k===cat?'selected':''}>${k}</option>`).join('')}</select></div>
-    <div class="field"><label>Ruolo</label><select id="ct_title"></select></div>
-    ${f('Potere decisionale','ct_auth',p.authority,'select',ENUM.authority)}
-    ${f('Email','ct_email',p.email,'email')}${f('Telefono','ct_phone',p.phone)}${f('LinkedIn','ct_link',p.linkedin)}<div></div>
+    ${f('Ruolo','ct_title',p.role_title,'datalist',ENUM.roleTitles)}${f('Potere decisionale','ct_auth',p.authority,'select',ENUM.authority)}
+    ${f('Email','ct_email',p.email,'email')}${f('Tel. Ufficio','ct_phone',p.phone)}
+    ${f('Mobile','ct_mobile',p.mobile)}${f('LinkedIn','ct_link',p.linkedin)}
     ${f('Note','ct_notes',p.notes,'textarea')}</div>`,async()=>{
-    const o={first_name:gv('ct_fn'),last_name:gv('ct_ln'),company:gv('ct_co'),role_cat:gv('ct_cat'),role_title:gv('ct_title'),authority:gv('ct_auth'),email:gv('ct_email'),phone:gv('ct_phone'),linkedin:gv('ct_link'),notes:gv('ct_notes')};
+    const o={first_name:gv('ct_fn'),last_name:gv('ct_ln'),company:gv('ct_co'),role_title:gv('ct_title'),authority:gv('ct_auth'),email:gv('ct_email'),phone:gv('ct_phone'),mobile:gv('ct_mobile'),linkedin:gv('ct_link'),notes:gv('ct_notes')};
     if(!o.first_name||!o.last_name)throw new Error('Nome e cognome obbligatori');id?await store.update('contacts',id,o):await store.insert('contacts',o);});
-  syncRoleTitles(p.role_title);}
+  }
 function syncRoleTitles(preset){const cat=gv('ct_cat');const sel=document.getElementById('ct_title');if(!sel)return;const opts=ENUM.roleCats[cat]||[];sel.innerHTML=opts.map(o=>`<option ${o===preset?'selected':''}>${o}</option>`).join('');}
 
 /* LEAD */
