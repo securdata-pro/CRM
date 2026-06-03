@@ -81,6 +81,19 @@ h1,h2,h3,h4{font-family:var(--disp);font-weight:700;letter-spacing:-.01em;margin
 .side .who button:hover{background:var(--red)}
 .del-btn{background:#fff;border:1px solid #e7b3b3;color:var(--red);font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer;font-weight:600}
 .del-btn:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.docpage{max-width:1180px;margin:0 auto;padding-bottom:40px}
+.docbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}
+.docbar .doctype{display:flex;flex-direction:column;gap:3px}
+.docbar .doctype label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.docbar .doctype select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:600;min-width:200px}
+.docbar .docno{margin-left:auto;color:var(--muted);font-size:15px}
+.doc-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.doc-main{display:flex;gap:14px;align-items:flex-start}
+.doc-main .doc-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.doc-main .doc-side{width:300px;flex:0 0 300px;position:sticky;top:80px}
+.dcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+.dcard h4{font-size:13px;margin:0 0 12px;color:#1a1c22}
+@media(max-width:1000px){.doc-cards{grid-template-columns:1fr}.doc-main{flex-direction:column}.doc-main .doc-side{width:100%;flex:none;position:static}}
 .userlist{display:flex;flex-direction:column}
 .urow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer}
 .urow:hover{background:#faf7f2}
@@ -331,6 +344,7 @@ const ENUM={
   prodType:['Hardware','Software','Licenza','Servizio'],
   appRoles:['Direzione','Commerciale','Tecnico','HR','Grafica'],
   roleTitles:['CEO','Owner','Direttore generale','CFO','CIO / Direttore IT','Direttore commerciale','Direttore tecnico','Responsabile acquisti / Buyer','Responsabile IT','Commerciale','Tecnico','Impiegato','Consulente','Altro'],
+  companySectors:['Informatica / IT','Telecomunicazioni','Servizi','Industria / Manifatturiero','Commercio / Retail','Edilizia / Costruzioni','Sanità / Farmaceutico','Finanza / Assicurazioni','Studi professionali','Pubblica amministrazione','Trasporti / Logistica','Turismo / Ristorazione','Agricoltura','Energia / Utilities','Immobiliare','Formazione / Istruzione','Media / Comunicazione','Altro'],
   countries:['Svizzera','Italia','Germania','Francia','Austria','Liechtenstein','Spagna','Portogallo','Paesi Bassi','Belgio','Lussemburgo','Regno Unito','Irlanda','Danimarca','Svezia','Norvegia','Finlandia','Polonia','Repubblica Ceca','Slovacchia','Slovenia','Croazia','Ungheria','Romania','Bulgaria','Grecia','Stati Uniti','Canada','Emirati Arabi Uniti','Altro'],
   currencies:['CHF','EUR','USD'],
   partnerTypes:['Vendor / Produttore','Distributore','Rivenditore','System Integrator','Segnalatore','Altro'],
@@ -489,8 +503,9 @@ const SIDE_THEMES={scuro:'#16181f',ardesia:'#222a36',rosso:'#4a1118',blu:'#16294
 function applyTheme(name){const t=THEMES[name]||THEMES.rosso;const r=document.documentElement.style;r.setProperty('--red',t[0]);r.setProperty('--red-d',t[1]);r.setProperty('--hot',t[0]);LS.set('securgest_theme',name);}
 function applySide(name){const c=SIDE_THEMES[name]||SIDE_THEMES.scuro;document.documentElement.style.setProperty('--side',c);LS.set('securgest_side',name);}
 function renderSwatches(){const host=document.getElementById('swatches');if(!host)return;const cur=(CURRENT_USER&&CURRENT_USER.theme)||LS.get('securgest_theme')||'rosso';const curS=(CURRENT_USER&&CURRENT_USER.side_theme)||LS.get('securgest_side')||'scuro';
-  host.innerHTML=`<span class="swlab" title="Colore accento (parte destra)">Tema</span>`+Object.entries(THEMES).map(([k,v])=>`<span class="sw ${k===cur?'on':''}" style="background:${v[0]}" title="Accento: ${k}" onclick="pickTheme('${k}')"></span>`).join('')+
-    `<span class="swdiv"></span><span class="swlab" title="Colore del menù a sinistra">Menù</span>`+Object.entries(SIDE_THEMES).map(([k,c])=>`<span class="sw ${k===curS?'on':''}" style="background:${c};box-shadow:inset 0 0 0 1px #3a3d47" title="Menù: ${k}" onclick="pickSide('${k}')"></span>`).join('');}
+  const T=['rosso','blu','verde','antracite'];const S=['scuro','ardesia','notte','rosso'];
+  host.innerHTML=`<span class="swlab" title="Colore accento (parte destra)">Tema</span>`+T.map(k=>`<span class="sw ${k===cur?'on':''}" style="background:${THEMES[k][0]}" title="Accento: ${k}" onclick="pickTheme('${k}')"></span>`).join('')+
+    `<span class="swdiv"></span><span class="swlab" title="Colore del menù a sinistra">Menù</span>`+S.map(k=>`<span class="sw ${k===curS?'on':''}" style="background:${SIDE_THEMES[k]};box-shadow:inset 0 0 0 1px #3a3d47" title="Menù: ${k}" onclick="pickSide('${k}')"></span>`).join('');}
 async function pickTheme(name){applyTheme(name);if(CURRENT_USER){CURRENT_USER.theme=name;if(CURRENT_USER.id){try{await store.update('app_users',CURRENT_USER.id,{theme:name})}catch(e){}}}renderSwatches();}
 async function pickSide(name){applySide(name);if(CURRENT_USER){CURRENT_USER.side_theme=name;if(CURRENT_USER.id){try{await store.update('app_users',CURRENT_USER.id,{side_theme:name})}catch(e){}}}renderSwatches();}
 
@@ -535,7 +550,7 @@ async function render(){
   const add=document.getElementById('primaryAdd');
   const addMap={leads:editLead,companies:editCompany,contacts:editContact,marketing:editCampaign,licenses:editLicense,products:editProduct,quotes:editQuote,invoices:editInvoice,sales_orders:editSalesOrder,purchase_orders:editPurchaseOrder,documents:editDocument,banks:editBank};
   const lbl={leads:'+ Nuovo lead',companies:'+ Nuova azienda',contacts:'+ Nuovo contatto',marketing:'+ Nuova campagna',partners:'+ Nuovo partner',licenses:'+ Nuova licenza',products:'+ Nuovo prodotto',quotes:'+ Nuovo preventivo',invoices:'+ Nuova fattura',sales_orders:'+ Nuovo ordine',purchase_orders:'+ Nuovo ordine',documents:'+ Carica documento',banks:'+ Nuovo conto'};
-  if(addMap[PAGE]){add.style.display='';add.onclick=()=>addMap[PAGE]();add.textContent=lbl[PAGE];}else add.style.display='none';
+  if(addMap[PAGE]&&PAGE!=='contacts'&&PAGE!=='companies'){add.style.display='';add.onclick=()=>addMap[PAGE]();add.textContent=lbl[PAGE];}else add.style.display='none';
   const c=document.getElementById('content');c.innerHTML='<div class="empty">Caricamento…</div>';
   try{ await VIEWS[PAGE](c); }catch(e){ c.innerHTML='<div class="callout">Errore: '+esc(e.message||e)+'</div>'; console.error(e);}
 }
@@ -665,7 +680,7 @@ VIEWS.companies=async(c)=>{const all=await store.list('companies');
   const companies=COMP_FILTER==='Tutti'?all:all.filter(co=>(co.types||[]).includes(COMP_FILTER));
   const selIds=getCompCols();const cols=COMP_COLS.filter(x=>selIds.includes(x.id));
   const headHtml=cols.map(x=>`<th${x.num?' class="num"':''}>${esc(x.label)}</th>`).join('');
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca azienda, settore…','sComp')}<div class="periodsel">${['Tutti',...ENUM.companyTypes].map(t=>`<button class="${COMP_FILTER===t?'on':''}" onclick="setCompFilter('${t}')">${t}</button>`).join('')}</div><button class="btn ghost sm" onclick="compColsCustomize()">⚙ Colonne</button><span style="color:var(--muted);font-size:12.5px">${companies.length} aziende</span></div>
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca azienda, settore…','sComp')}<div class="periodsel">${['Tutti',...ENUM.companyTypes].map(t=>`<button class="${COMP_FILTER===t?'on':''}" onclick="setCompFilter('${t}')">${t}</button>`).join('')}</div><button class="btn ghost sm" onclick="compColsCustomize()">⚙ Colonne</button><button class="btn sm" onclick="editCompany()">+ Nuova azienda</button><span style="color:var(--muted);font-size:12.5px">${companies.length} aziende</span></div>
   <div class="card"><table><thead><tr><th>Azienda</th>${headHtml}<th></th></tr></thead><tbody>${
   companies.map(co=>`<tr data-s="${esc((co.name+' '+co.sector+' '+co.city+' '+(co.vat_number||'')+' '+(co.types||[]).join(' ')).toLowerCase())}" onclick="editCompany('${co.id}')"><td><b>${esc(co.name)}</b><br><span style="color:var(--muted);font-size:12px">${esc(co.city||'')} ${co.country?'· '+esc(co.country):''}</span></td>${cols.map(x=>`<td${x.num?' class="num"':''}>${x.cell(co)}</td>`).join('')}<td class="rowact"><button class="iconbtn" title="Situazione azienda" onclick="event.stopPropagation();companyDossier('${co.id}')">📋</button><button class="iconbtn" onclick="event.stopPropagation();delRow('companies','${co.id}')">🗑</button></td></tr>`).join('')||`<tr><td colspan="${cols.length+2}" class="empty">Nessuna azienda.</td></tr>`}</tbody></table></div>`;};
 
@@ -684,7 +699,7 @@ function conColsCustomize(){const sel=getConCols();openModal('Colonne elenco con
 VIEWS.contacts=async(c)=>{const [contacts,companies]=await Promise.all([store.list('contacts'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
   const selIds=getConCols();const cols=CON_COLS.filter(x=>selIds.includes(x.id));
   const headHtml=cols.map(x=>`<th>${esc(x.label)}</th>`).join('');
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca contatto…','sCon')}<button class="btn ghost sm" onclick="conColsCustomize()">⚙ Colonne</button><span style="color:var(--muted);font-size:12.5px">${contacts.length} contatti</span></div>
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca contatto…','sCon')}<button class="btn ghost sm" onclick="conColsCustomize()">⚙ Colonne</button><button class="btn sm" onclick="editContact()">+ Nuovo contatto</button><span style="color:var(--muted);font-size:12.5px">${contacts.length} contatti</span></div>
   <div class="card"><table><thead><tr><th>Nome</th>${headHtml}<th></th></tr></thead><tbody>${
   contacts.map(p=>`<tr data-s="${esc((p.first_name+' '+p.last_name+' '+(comp[p.company]||{}).name+' '+p.role_title).toLowerCase())}" onclick="editContact('${p.id}')"><td><b>${esc(p.first_name+' '+p.last_name)}</b></td>${cols.map(x=>`<td>${x.cell(p,comp)}</td>`).join('')}<td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('contacts','${p.id}')">🗑</button></td></tr>`).join('')||`<tr><td colspan="${cols.length+2}" class="empty">Nessun contatto.</td></tr>`}</tbody></table></div>`;};
 
@@ -870,13 +885,16 @@ async function delSelectedProducts(){const ids=selectedProds();if(!ids.length)re
 async function refOptions(table,labelFn){const rows=await store.list(table);return rows.map(r=>({id:r.id,label:labelFn(r)}))}
 
 /* COMPANY */
+function isCH(){const c=(gv('co_country')||'').toLowerCase();return !c||/svizz|suisse|schweiz|switz/.test(c)||c==='ch';}
+async function chZipToCity(){if(!isCH())return;const z=(gv('co_zip')||'').trim();if(!/^\d{4}$/.test(z))return;const cy=document.getElementById('co_city');if(!cy||cy.value.trim())return;try{const r=await fetch('https://openplzapi.org/ch/Localities?postalCode='+encodeURIComponent('^'+z+'$'));const a=await r.json();if(a&&a[0])cy.value=a[0].name;}catch(e){}}
+async function chCityToZip(){if(!isCH())return;const n=(gv('co_city')||'').trim();if(n.length<2)return;const zp=document.getElementById('co_zip');if(!zp||zp.value.trim())return;try{let r=await fetch('https://openplzapi.org/ch/Localities?name='+encodeURIComponent('^'+n+'$'));let a=await r.json();if(!(a&&a[0])){r=await fetch('https://openplzapi.org/ch/Localities?name='+encodeURIComponent(n));a=await r.json();}if(a&&a[0])zp.value=a[0].postalCode;}catch(e){}}
 function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
     ${f('Ragione sociale *','co_name',co.name)}${f('P.IVA / N. IVA','co_vat',co.vat_number)}
     <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
-    ${f('Indirizzo','co_addr',co.address)}${f('CAP','co_zip',co.zip)}
-    ${f('Città','co_city',co.city)}${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
+    ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
+    <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     <div class="sec-title">Profilo aziendale</div>
-    ${f('Settore','co_sector',co.sector)}${f('N. dipendenti','co_emp',co.employees,'number')}
+    ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
     ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
     <div class="sec-title">Infrastruttura IT attuale</div>
@@ -911,10 +929,10 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
   openModal(id?'Modifica azienda':'Nuova azienda',`<div class="fgrid"><div class="sec-title">Anagrafica</div>
     ${f('Ragione sociale *','co_name',co.name)}${f('P.IVA / N. IVA','co_vat',co.vat_number)}
     <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
-    ${f('Indirizzo','co_addr',co.address)}${f('CAP','co_zip',co.zip)}
-    ${f('Città','co_city',co.city)}${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
+    ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
+    <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     <div class="sec-title">Profilo aziendale</div>
-    ${f('Settore','co_sector',co.sector)}${f('N. dipendenti','co_emp',co.employees,'number')}
+    ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
     ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
     <div class="sec-title">Infrastruttura IT attuale</div>
@@ -965,14 +983,18 @@ async function printStatement(id){
   document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';closeModal();}
 
 /* CONTACT */
+const PHONE_CC=[{f:'🇨🇭',d:'+41'},{f:'🇮🇹',d:'+39'},{f:'🇩🇪',d:'+49'},{f:'🇫🇷',d:'+33'},{f:'🇦🇹',d:'+43'},{f:'🇱🇮',d:'+423'},{f:'🇬🇧',d:'+44'},{f:'🇪🇸',d:'+34'},{f:'🇵🇹',d:'+351'},{f:'🇳🇱',d:'+31'},{f:'🇧🇪',d:'+32'},{f:'🇱🇺',d:'+352'},{f:'🇮🇪',d:'+353'},{f:'🇩🇰',d:'+45'},{f:'🇸🇪',d:'+46'},{f:'🇳🇴',d:'+47'},{f:'🇫🇮',d:'+358'},{f:'🇵🇱',d:'+48'},{f:'🇨🇿',d:'+420'},{f:'🇬🇷',d:'+30'}];
+function splitPhone(v){v=(v||'').trim();const ord=[...PHONE_CC].sort((a,b)=>b.d.length-a.d.length);for(const p of ord){if(v.startsWith(p.d))return {cc:p.d,num:v.slice(p.d.length).trim()};}return {cc:'+41',num:v};}
+function phoneField(label,id,value){const sp=splitPhone(value);return `<div class="field"><label>${esc(label)}</label><div style="display:flex;gap:6px"><select id="${id}_cc" style="flex:0 0 104px">${PHONE_CC.map(p=>`<option value="${p.d}" ${p.d===sp.cc?'selected':''}>${p.f} ${p.d}</option>`).join('')}</select><input id="${id}" style="flex:1" value="${esc(sp.num)}"></div></div>`;}
+function readPhone(id){const cc=gv(id+'_cc')||'';const num=(gv(id)||'').trim();return num?(cc+' '+num).trim():'';}
 async function editContact(id){const p=id?await store.get('contacts',id):{};const comps=await refOptions('companies',r=>r.name);
   openModal(id?'Modifica contatto':'Nuovo contatto',`<div class="fgrid">
     ${f('Nome *','ct_fn',p.first_name)}${f('Cognome *','ct_ln',p.last_name)}${f('Azienda','ct_co',p.company,'ref',comps)}
     ${f('Ruolo','ct_title',p.role_title,'datalist',ENUM.roleTitles)}${f('Potere decisionale','ct_auth',p.authority,'select',ENUM.authority)}
-    ${f('Email','ct_email',p.email,'email')}${f('Tel. Ufficio','ct_phone',p.phone)}
-    ${f('Mobile','ct_mobile',p.mobile)}${f('LinkedIn','ct_link',p.linkedin)}
+    ${f('Email','ct_email',p.email,'email')}${phoneField('Tel. Ufficio','ct_phone',p.phone)}
+    ${phoneField('Mobile','ct_mobile',p.mobile)}${f('LinkedIn','ct_link',p.linkedin)}
     ${f('Note','ct_notes',p.notes,'textarea')}</div>`,async()=>{
-    const o={first_name:gv('ct_fn'),last_name:gv('ct_ln'),company:gv('ct_co'),role_title:gv('ct_title'),authority:gv('ct_auth'),email:gv('ct_email'),phone:gv('ct_phone'),mobile:gv('ct_mobile'),linkedin:gv('ct_link'),notes:gv('ct_notes')};
+    const o={first_name:gv('ct_fn'),last_name:gv('ct_ln'),company:gv('ct_co'),role_title:gv('ct_title'),authority:gv('ct_auth'),email:gv('ct_email'),phone:readPhone('ct_phone'),mobile:readPhone('ct_mobile'),linkedin:gv('ct_link'),notes:gv('ct_notes')};
     if(!o.first_name||!o.last_name)throw new Error('Nome e cognome obbligatori');id?await store.update('contacts',id,o):await store.insert('contacts',o);});
   }
 function syncRoleTitles(preset){const cat=gv('ct_cat');const sel=document.getElementById('ct_title');if(!sel)return;const opts=ENUM.roleCats[cat]||[];sel.innerHTML=opts.map(o=>`<option ${o===preset?'selected':''}>${o}</option>`).join('');}
@@ -1161,9 +1183,13 @@ function editQuote(id){return docForm('quote',id)}
 function editInvoice(id){return docForm('invoice',id)}
 function editSalesOrder(id){return docForm('sales_order',id)}
 function editPurchaseOrder(id){return docForm('purchase_order',id)}
+const KIND_PAGE={quote:'quotes',invoice:'invoices',sales_order:'sales_orders',purchase_order:'purchase_orders'};
+const KIND_LABELS=[['quote','Preventivo'],['invoice','Fattura'],['sales_order','Ordine cliente'],['purchase_order','Ordine a fornitore']];
+let DOC_EDIT=null;
 async function docForm(kind,id){
   const cfg=DOC_CFG[kind];const s=await store.settings();CUR=s.currency||'CHF';
   const doc=id?await store.get(cfg.table,id):{currency:s.currency,status:cfg.statuses[0],date:todayISO(),lines:[],documents:[],number:await nextNumber(kind),payment_terms:'30 giorni data fattura'};
+  DOC_EDIT={kind,id,cfg};
   LINE_BUF=JSON.parse(JSON.stringify(doc.lines||[]));if(!LINE_BUF.length)LINE_BUF.push({code:'',desc:'',qty:1,price:0,vat:s.default_vat});
   const partyField=cfg.supplier?'supplier':'company';
   const allCompanies=await store.list('companies');
@@ -1172,26 +1198,49 @@ async function docForm(kind,id){
   const cons=await store.list('contacts');const conOpts=cons.map(x=>({id:x.id,label:x.first_name+' '+x.last_name}));
   const users=await store.list('app_users');const allDocs=await store.list('documents');const banks=await store.list('banks');const prods=await store.list('products');DOC_PRODS=prods;
   const attached=doc.documents||[];const showBank=kind!=='purchase_order';
-  openModal(id?`Modifica ${cfg.label}`:`Nuovo ${cfg.label}`,`<div class="fgrid">
-    ${f('Numero','dc_num',doc.number)}<div class="field"><label>${esc(cfg.partyLabel)} *</label><div style="display:flex;gap:6px;align-items:center"><select id="dc_party" style="flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff"><option value="">—</option>${partyOpts.map(o=>`<option value="${o.id}" ${o.id===doc[partyField]?'selected':''}>${esc(o.label)}</option>`).join('')}</select><button class="btn ghost sm" type="button" onclick="newPartyCompany(${cfg.supplier?'true':'false'})">+ Nuova</button></div></div>
-    ${!cfg.supplier?f('Riferimento cliente (contatto)','dc_ct',doc.contact,'ref',conOpts):'<div></div>'}
-    <div class="field"><label>Riferimento commerciale</label><select id="dc_ref"><option value="">—</option>${users.map(u=>`<option ${u.full_name===doc.commercial_ref?'selected':''}>${esc(u.full_name)}</option>`).join('')}</select></div>
-    ${f('Data','dc_date',doc.date,'date')}${f(cfg.expLabel,'dc_exp',doc.expiry,'date')}
-    ${f('Stato','dc_status',doc.status,'select',cfg.statuses)}${f('Valuta','dc_cur',doc.currency||s.currency||'CHF','select',ENUM.currencies)}
-    <div class="field full"><label class="toggle"><input type="checkbox" id="dc_disc" ${doc.show_discount?'checked':''}> Mostra la colonna <b>Sconto</b> nel documento stampato</label></div>
-  </div>
-  <div class="sec-title" style="border:0;display:flex;align-items:center"><span style="flex:1">Righe</span><select id="catPick" onchange="addFromCatalog(this.value);this.value=''" style="max-width:320px;padding:7px 8px;border:1px solid var(--line);border-radius:7px;text-transform:none;letter-spacing:0;font-weight:400"><option value="">+ Aggiungi da catalogo…</option>${prods.map(p=>`<option value="${p.id}">${esc((p.code?p.code+' · ':'')+p.name)}</option>`).join('')}</select></div>
-  <table class="lines"><thead><tr><th style="width:104px">Codice</th><th>Descrizione</th><th style="width:50px" class="num">Q.tà</th><th style="width:86px" class="num">Prezzo</th><th style="width:48px" class="num">IVA%</th><th style="width:54px" class="num">Sc.%</th><th style="width:92px" class="num">Importo</th><th style="width:58px"></th></tr></thead><tbody id="lineRows"></tbody></table>${prodDatalists()}
-  <div style="font-size:11.5px;color:var(--muted);margin-top:6px">Scrivi o scegli un prodotto nel campo <b>Codice</b> o <b>Descrizione</b>: i dati si completano da soli. Se non è in elenco, compila la riga e premi 💾 per aggiungerlo al catalogo.</div>
-  <button class="btn ghost sm" style="margin-top:10px" onclick="addLine(${s.default_vat})">+ Riga vuota</button>
-  <div id="totWrap"></div>
-  <div class="fgrid" style="margin-top:16px">${f('Termini di pagamento','dc_terms',doc.payment_terms)}${showBank?`<div class="field"><label>Conto bancario (coordinate in fattura)</label><select id="dc_bank"><option value="">— nessuno —</option>${banks.map(b=>`<option value="${b.id}" ${b.id===doc.bank_id?'selected':''}>${esc(b.label)} — ${esc(b.iban||'')}</option>`).join('')}</select></div>`:'<div></div>'}${f('Note','dc_notes',doc.notes,'textarea')}
-    ${kind==='quote'?`<div class="full"><div class="sec-title" style="border:0;padding:0;margin:6px 0">Allegati dal repository</div><div class="checks">${allDocs.map(d=>`<label class="${attached.includes(d.id)?'on':''}"><input type="checkbox" class="atchk" value="${d.id}" ${attached.includes(d.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(d.name)}</label>`).join('')||'<span style="color:var(--muted);font-size:12.5px">Nessun documento nel repository.</span>'}</div></div>`:''}
-  </div>`,async()=>{collectLines();
-    const o={number:gv('dc_num'),contact:!cfg.supplier?gv('dc_ct'):'',commercial_ref:gv('dc_ref'),date:gv('dc_date'),expiry:gv('dc_exp'),status:gv('dc_status'),currency:gv('dc_cur'),payment_terms:gv('dc_terms'),bank_id:showBank?gv('dc_bank'):'',notes:gv('dc_notes'),show_discount:gv('dc_disc'),lines:LINE_BUF.filter(l=>l.desc||l.price)};
-    o[partyField]=gv('dc_party');if(kind==='quote')o.documents=[...document.querySelectorAll('.atchk:checked')].map(x=>x.value);
-    if(!o[partyField])throw new Error(cfg.partyLabel+' obbligatorio');id?await store.update(cfg.table,id,o):await store.insert(cfg.table,o);
-  },{wide:true,saveLabel:'Salva documento'});
+  document.getElementById('pageTitle').textContent=(id?'Modifica ':'Nuovo ')+cfg.label;
+  const cont=document.getElementById('content');
+  cont.innerHTML=`<div class="docpage">
+    <div class="docbar"><button class="btn ghost sm" onclick="closeDocForm()">\u2039 Torna indietro</button>
+      <div class="doctype"><label>Documento</label><select id="dc_kind" ${id?'disabled':''} onchange="docForm(this.value)">${KIND_LABELS.map(([k,l])=>`<option value="${k}" ${k===kind?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="docno">n\u00b0 <b>${esc(doc.number)}</b></div></div>
+    <div class="doc-cards">
+      <div class="dcard"><h4>${esc(cfg.partyLabel)}</h4>
+        <div class="field"><label>${esc(cfg.partyLabel)} *</label><div style="display:flex;gap:6px"><select id="dc_party" style="flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff"><option value="">\u2014</option>${partyOpts.map(o=>`<option value="${o.id}" ${o.id===doc[partyField]?'selected':''}>${esc(o.label)}</option>`).join('')}</select><button class="btn ghost sm" type="button" onclick="newPartyCompany(${cfg.supplier?'true':'false'})">+ Nuova</button></div></div>
+        ${!cfg.supplier?f('Riferimento (contatto)','dc_ct',doc.contact,'ref',conOpts):''}
+      </div>
+      <div class="dcard"><h4>Dati documento</h4><div class="fgrid">
+        ${f('Data','dc_date',doc.date,'date')}${f('Numero','dc_num',doc.number)}
+        ${f(cfg.expLabel,'dc_exp',doc.expiry,'date')}${f('Valuta','dc_cur',doc.currency||s.currency||'CHF','select',ENUM.currencies)}
+        ${f('Stato','dc_status',doc.status,'select',cfg.statuses)}<div class="field"><label>Rif. commerciale</label><select id="dc_ref"><option value="">\u2014</option>${users.map(u=>`<option ${u.full_name===doc.commercial_ref?'selected':''}>${esc(u.full_name)}</option>`).join('')}</select></div>
+        <div class="field full">${f('Oggetto (visibile in stampa)','dc_subject',doc.subject)}</div>
+      </div></div>
+      <div class="dcard"><h4>Opzioni</h4>
+        <label class="toggle"><input type="checkbox" id="dc_disc" ${doc.show_discount?'checked':''}> Mostra colonna <b>Sconto</b> in stampa</label>
+        ${showBank?`<div class="field" style="margin-top:12px"><label>Conto bancario</label><select id="dc_bank"><option value="">\u2014 nessuno \u2014</option>${banks.map(b=>`<option value="${b.id}" ${b.id===doc.bank_id?'selected':''}>${esc(b.label)} \u2014 ${esc(b.iban||'')}</option>`).join('')}</select></div>`:''}
+        ${f('Termini di pagamento','dc_terms',doc.payment_terms)}
+      </div>
+    </div>
+    <div class="doc-main">
+      <div class="doc-left">
+        <div class="dcard"><h4 style="display:flex;align-items:center"><span style="flex:1">Lista righe</span><select id="catPick" onchange="addFromCatalog(this.value);this.value=''" style="max-width:300px;padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-weight:400;text-transform:none;letter-spacing:0"><option value="">+ Aggiungi da catalogo\u2026</option>${prods.map(p=>`<option value="${p.id}">${esc((p.code?p.code+' \u00b7 ':'')+p.name)}</option>`).join('')}</select></h4>
+          <table class="lines"><thead><tr><th style="width:104px">Codice</th><th>Descrizione</th><th style="width:50px" class="num">Q.t\u00e0</th><th style="width:86px" class="num">Prezzo</th><th style="width:48px" class="num">IVA%</th><th style="width:54px" class="num">SC.%</th><th style="width:92px" class="num">Importo</th><th style="width:58px"></th></tr></thead><tbody id="lineRows"></tbody></table>${prodDatalists()}
+          <button class="btn ghost sm" style="margin-top:10px" onclick="addLine(${s.default_vat})">+ Aggiungi voce</button>
+          ${kind==='quote'?`<div style="margin-top:14px"><div class="sec-title" style="border:0;padding:0;margin:6px 0">Allegati dal repository</div><div class="checks">${allDocs.map(d=>`<label class="${attached.includes(d.id)?'on':''}"><input type="checkbox" class="atchk" value="${d.id}" ${attached.includes(d.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(d.name)}</label>`).join('')||'<span style="color:var(--muted);font-size:12.5px">Nessun documento nel repository.</span>'}</div></div>`:''}
+        </div>
+        <div class="dcard"><h4>Note documento</h4>${f('','dc_notes',doc.notes,'textarea')}</div>
+      </div>
+      <div class="doc-side">
+        <div class="dcard"><h4>Riepilogo</h4><div id="totWrap"></div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+            <button class="btn red" onclick="saveDoc('back')">\ud83d\udcbe Salva</button>
+            ${!cfg.supplier?`<button class="btn" onclick="saveDoc('send')">\u2709 Salva e invia</button>`:''}
+            <button class="btn ghost" onclick="saveDoc('print')">\ud83d\udda8 Salva e stampa</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
   CUR=doc.currency||s.currency||'CHF';
   let DOC_CUR=CUR;const RATES={CHF:1,EUR:Number(s.rate_eur)||0.95,USD:Number(s.rate_usd)||0.88};
   const curEl=document.getElementById('dc_cur');
@@ -1199,6 +1248,19 @@ async function docForm(kind,id){
     if(oldC!==newC){const fct=(RATES[oldC]||1)/(RATES[newC]||1);document.querySelectorAll('#lineRows .ln-price').forEach(inp=>{const v=parseFloat(inp.value)||0;inp.value=Math.round(v*fct*100)/100;});}
     DOC_CUR=newC;CUR=newC;recalc();});
   renderLines();}
+function closeDocForm(){const k=DOC_EDIT&&DOC_EDIT.kind;DOC_EDIT=null;go(KIND_PAGE[k]||'quotes');}
+async function saveDoc(mode){if(!DOC_EDIT)return;const {kind,id,cfg}=DOC_EDIT;const partyField=cfg.supplier?'supplier':'company';const showBank=kind!=='purchase_order';
+  collectLines();
+  const o={number:gv('dc_num'),contact:!cfg.supplier?gv('dc_ct'):'',commercial_ref:gv('dc_ref'),date:gv('dc_date'),expiry:gv('dc_exp'),status:gv('dc_status'),currency:gv('dc_cur'),subject:gv('dc_subject'),payment_terms:gv('dc_terms'),bank_id:showBank?gv('dc_bank'):'',notes:gv('dc_notes'),show_discount:gv('dc_disc'),lines:LINE_BUF.filter(l=>l.desc||l.price)};
+  o[partyField]=gv('dc_party');if(kind==='quote')o.documents=[...document.querySelectorAll('.atchk:checked')].map(x=>x.value);
+  if(!o[partyField]){alert(cfg.partyLabel+' obbligatorio');return;}
+  let savedId=id;
+  try{if(id){await store.update(cfg.table,id,o);}else{const r=await store.insert(cfg.table,o);savedId=r.id;DOC_EDIT.id=savedId;}}catch(e){alert('Errore: '+(e.message||e));return;}
+  toast('Documento salvato');
+  if(mode==='print'){await printDoc(kind,savedId);}
+  else if(mode==='send'){await sendDoc(kind,savedId);}
+  else{closeDocForm();}
+}
 async function newPartyCompany(isSupplier){
   const type=isSupplier?'Fornitore':'Cliente';
   openModal2('Nuova azienda',companyFieldsHtml({types:[type]}),async()=>{
@@ -1264,6 +1326,7 @@ function docPartyMetaHtml(ctx){const {cfg,doc,party,ct}=ctx;return `<div style="
        <div><div class="lb">DATA ${esc(cfg.title)}:</div><div class="vv">${dateIt(doc.date)}</div></div>
        <div><div class="lb">${esc(cfg.expLabel)}:</div><div class="vv">${dateIt(doc.expiry)}</div></div>
        <div><div class="lb">RIF. COMMERCIALE:</div><div class="vv">${esc(doc.commercial_ref||'—')}</div></div>
+       ${doc.subject?`<div style="grid-column:1/-1"><div class="lb">OGGETTO:</div><div class="vv">${esc(doc.subject)}</div></div>`:''}
        ${ct?`<div><div class="lb">Vostro riferimento</div><div class="vv">${esc(ct.first_name+' '+ct.last_name)}</div></div>`:''}
      </div>`;}
 function docTableHead(showDisc){return `<thead><tr><th style="text-align:left;width:74px">Codice</th><th style="text-align:left">Descrizione</th><th class="amt" style="width:42px">Q.tà</th><th class="amt" style="width:90px">Prezzo unit.</th>${showDisc?'<th class="amt" style="width:42px">SC.</th>':''}<th class="amt" style="width:48px">IVA</th><th class="amt" style="width:92px">Importo</th></tr></thead>`;}
