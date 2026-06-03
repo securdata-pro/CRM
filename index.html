@@ -182,8 +182,8 @@ tbody tr{transition:.1s}tbody tr:hover{background:#faf9f5;cursor:pointer}
 .checks label{display:flex;align-items:center;gap:7px;font-size:13px;background:#faf9f5;border:1px solid var(--line);padding:7px 10px;border-radius:8px;cursor:pointer}
 .checks label.on{border-color:var(--red);background:#fff}
 
-.lines th,.lines td{padding:8px 10px}
-.lines input,.lines select{padding:7px 8px;border:1px solid var(--line);border-radius:6px;width:100%}
+.lines th,.lines td{padding:8px 5px}
+.lines input,.lines select{padding:7px 6px;border:1px solid var(--line);border-radius:6px;width:100%}
 .lines .num input{text-align:right}
 .totbox{margin-top:16px;margin-left:auto;width:300px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .totbox .r{display:flex;justify-content:space-between;padding:9px 14px;border-bottom:1px solid #f0efe9}
@@ -1224,7 +1224,7 @@ async function docForm(kind,id){
     <div class="doc-main">
       <div class="doc-left">
         <div class="dcard"><h4 style="display:flex;align-items:center"><span style="flex:1">Lista righe</span><select id="catPick" onchange="addFromCatalog(this.value);this.value=''" style="max-width:300px;padding:7px 8px;border:1px solid var(--line);border-radius:7px;font-weight:400;text-transform:none;letter-spacing:0"><option value="">+ Aggiungi da catalogo\u2026</option>${prods.map(p=>`<option value="${p.id}">${esc((p.code?p.code+' \u00b7 ':'')+p.name)}</option>`).join('')}</select></h4>
-          <table class="lines"><thead><tr><th style="width:104px">Codice</th><th>Descrizione</th><th style="width:50px" class="num">Q.t\u00e0</th><th style="width:86px" class="num">Prezzo</th><th style="width:48px" class="num">IVA%</th><th style="width:54px" class="num">SC.%</th><th style="width:92px" class="num">Importo</th><th style="width:58px"></th></tr></thead><tbody id="lineRows"></tbody></table>${prodDatalists()}
+          <table class="lines"><thead><tr><th style="width:104px">Codice</th><th>Descrizione</th><th style="width:66px" class="num">Q.t\u00e0</th><th style="width:96px" class="num">Prezzo</th><th style="width:80px" class="num">IVA%</th><th style="width:72px" class="num">SC.%</th><th style="width:124px" class="num">Importo</th><th style="width:58px"></th></tr></thead><tbody id="lineRows"></tbody></table>${prodDatalists()}
           <button class="btn ghost sm" style="margin-top:10px" onclick="addLine(${s.default_vat})">+ Aggiungi voce</button>
           ${kind==='quote'?`<div style="margin-top:14px"><div class="sec-title" style="border:0;padding:0;margin:6px 0">Allegati dal repository</div><div class="checks">${allDocs.map(d=>`<label class="${attached.includes(d.id)?'on':''}"><input type="checkbox" class="atchk" value="${d.id}" ${attached.includes(d.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(d.name)}</label>`).join('')||'<span style="color:var(--muted);font-size:12.5px">Nessun documento nel repository.</span>'}</div></div>`:''}
         </div>
@@ -1326,8 +1326,8 @@ function docPartyMetaHtml(ctx){const {cfg,doc,party,ct}=ctx;return `<div style="
        <div><div class="lb">DATA ${esc(cfg.title)}:</div><div class="vv">${dateIt(doc.date)}</div></div>
        <div><div class="lb">${esc(cfg.expLabel)}:</div><div class="vv">${dateIt(doc.expiry)}</div></div>
        <div><div class="lb">RIF. COMMERCIALE:</div><div class="vv">${esc(doc.commercial_ref||'—')}</div></div>
-       ${doc.subject?`<div style="grid-column:1/-1"><div class="lb">OGGETTO:</div><div class="vv">${esc(doc.subject)}</div></div>`:''}
        ${ct?`<div><div class="lb">Vostro riferimento</div><div class="vv">${esc(ct.first_name+' '+ct.last_name)}</div></div>`:''}
+       ${doc.subject?`<div style="flex:0 0 100%;margin-top:4px"><div class="lb">OGGETTO:</div><div class="vv" style="white-space:normal">${esc(doc.subject)}</div></div>`:''}
      </div>`;}
 function docTableHead(showDisc){return `<thead><tr><th style="text-align:left;width:74px">Codice</th><th style="text-align:left">Descrizione</th><th class="amt" style="width:42px">Q.tà</th><th class="amt" style="width:90px">Prezzo unit.</th>${showDisc?'<th class="amt" style="width:42px">SC.</th>':''}<th class="amt" style="width:48px">IVA</th><th class="amt" style="width:92px">Importo</th></tr></thead>`;}
 function docRowHtml(l,showDisc){const amt=(l.qty||0)*(l.price||0)*(1-((l.disc||0)/100));return `<tr><td class="mono" style="font-size:11px;white-space:nowrap">${esc(l.code||'—')}</td><td class="desc">${esc(l.desc)}</td><td class="amt mono">${l.qty}</td><td class="amt mono">${pmoney(l.price)}</td>${showDisc?`<td class="amt mono">${(l.disc||0)?(l.disc+'%'):'—'}</td>`:''}<td class="amt mono">${l.vat}%</td><td class="amt mono">${pmoney(amt)}</td></tr>`;}
