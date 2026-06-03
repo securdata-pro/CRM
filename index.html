@@ -178,9 +178,9 @@ tbody tr{transition:.1s}tbody tr:hover{background:#faf9f5;cursor:pointer}
 .totbox .r span:last-child{font-family:var(--mono)}
 
 #printroot{display:none}
-@media print{ @page{margin:0} body *{visibility:hidden} #printroot,#printroot *{visibility:visible} #printroot{display:block;position:absolute;inset:0;background:#fff} }
+@media print{ @page{size:A4;margin:0} body *{visibility:hidden} #printroot,#printroot *{visibility:visible} #printroot{display:block;position:absolute;inset:0;background:#fff} }
 .doc{max-width:840px;margin:0 auto;padding:14mm 16mm 16mm;color:#1a1c22;font-size:13px}
-.doc .dhd{display:flex;justify-content:space-between;border-bottom:2px solid #1a1c22;padding-bottom:14px}
+.doc .dhd{display:flex;justify-content:space-between;border-bottom:1px solid #d2d5da;padding-bottom:14px}
 .doc .dhd .co .nm{font-family:var(--disp);font-weight:800;font-size:22px;display:flex;align-items:center;gap:8px}
 .doc .dhd .co .nm .mk{width:26px;height:26px;background:var(--red);border-radius:6px;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:16px}
 .doc .dhd .co .ad{color:#555;font-size:11.5px;margin-top:8px;line-height:1.6}
@@ -192,16 +192,23 @@ tbody tr{transition:.1s}tbody tr:hover{background:#faf9f5;cursor:pointer}
 .doc .meta div .lb{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#999}
 .doc .meta div .vv{font-weight:600;margin-top:2px}
 .doc table.it{width:100%;border-collapse:collapse;margin-top:8px}
-.doc table.it th{font-size:10.5px;color:#888;border-bottom:1px solid #ccc;padding:8px 5px}
-.doc table.it td{padding:9px 5px;border-bottom:1px solid #eee;font-size:12.5px}
+.doc table.it th{font-size:10.5px;color:#888;border-bottom:1px solid #ccc;padding:8px 12px}
+.doc table.it td{padding:11px 12px;border-bottom:1px solid #eee;font-size:12.5px}
 .doc table.it th.amt,.doc table.it td.amt{white-space:nowrap;text-align:right}
 .doc table.it .desc small{color:#888;display:block;margin-top:2px}
-.doc .dtot{width:280px;margin-left:auto;margin-top:14px}
+.doc .dtot{width:280px;margin-left:auto;margin-top:26px}
 .doc .dtot .r{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee}
-.doc .dtot .r.big{border-top:2px solid #1a1c22;border-bottom:0;font-weight:800;font-size:16px;padding-top:10px;margin-top:4px}
+.doc .dtot .r.big{border-top:1px solid #c9ccd2;border-bottom:0;font-weight:800;font-size:16px;padding-top:10px;margin-top:4px}
 .doc .notes{margin-top:30px;font-size:11.5px;color:#555;border-top:1px solid #ddd;padding-top:14px}
 .doc .notes .lb{text-transform:uppercase;letter-spacing:.06em;color:#999;font-size:10px}
 .doc .foot{margin-top:36px;text-align:center;color:#aaa;font-size:10.5px;border-top:1px solid #eee;padding-top:10px}
+.page{width:794px;min-height:1123px;background:#fff;margin:0 auto 18px;padding:54px 56px 120px;position:relative;box-sizing:border-box;color:#1a1c22;font-size:13px;box-shadow:0 2px 14px rgba(0,0,0,.12)}
+.page .doc{padding:0;max-width:none}
+.page .pfoot{position:absolute;left:56px;right:56px;bottom:44px;display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:1px solid #eee;padding-top:10px;color:#9aa0a8;font-size:10px}
+.page .pfoot .pno{white-space:nowrap;font-variant-numeric:tabular-nums}
+.doc .dtot{page-break-inside:avoid;break-inside:avoid}
+.doc table.it tr{page-break-inside:avoid}
+@media print{.page{margin:0;box-shadow:none;page-break-after:always}.page:last-child{page-break-after:auto}}
 .printbar{position:fixed;top:0;left:0;right:0;background:#16181f;color:#fff;display:flex;gap:10px;align-items:center;padding:12px 20px;z-index:300}
 .printbar .spacer{flex:1} @media print{.printbar{display:none}}
 .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
@@ -294,6 +301,7 @@ tbody tr{transition:.1s}tbody tr:hover{background:#faf9f5;cursor:pointer}
 </div>
 
 <div id="modalHost"></div>
+<div id="modalHost2"></div>
 <div id="printroot"></div>
 
 <script>
@@ -833,9 +841,12 @@ async function saveCompanyData(){await store.saveSettings({name:val('st_name'),a
 function val(id){const e=document.getElementById(id);return e?e.value:''}
 
 /* ===== form engine ===== */
-function openModal(title,bodyHtml,onSave,opts={}){const h=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="${opts.wide?'max-width:920px':''}"><div class="mhd"><h3>${esc(title)}</h3><button onclick="closeModal()">×</button></div><div class="mbd">${bodyHtml}</div><div class="mft">${opts.extra||''}<button class="btn ghost" onclick="closeModal()">Annulla</button><button class="btn red" id="modalSave">${opts.saveLabel||'Salva'}</button></div></div></div>`;
+function openModal(title,bodyHtml,onSave,opts={}){const h=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" style="${opts.wide?'max-width:1180px':''}"><div class="mhd"><h3>${esc(title)}</h3><button onclick="closeModal()">×</button></div><div class="mbd">${bodyHtml}</div><div class="mft">${opts.extra||''}<button class="btn ghost" onclick="closeModal()">Annulla</button><button class="btn red" id="modalSave">${opts.saveLabel||'Salva'}</button></div></div></div>`;
   document.getElementById('modalHost').innerHTML=h;document.getElementById('modalSave').onclick=async()=>{try{await onSave();closeModal();render();}catch(e){alert('Errore: '+(e.message||e))}};}
 function closeModal(){document.getElementById('modalHost').innerHTML=''}
+function openModal2(title,bodyHtml,onSave,opts={}){const h=`<div class="modal-bg" style="z-index:210" onclick="if(event.target===this)closeModal2()"><div class="modal" style="${opts.wide?'max-width:1180px':''}"><div class="mhd"><h3>${esc(title)}</h3><button onclick="closeModal2()">×</button></div><div class="mbd">${bodyHtml}</div><div class="mft">${opts.extra||''}<button class="btn ghost" onclick="closeModal2()">Annulla</button><button class="btn red" id="modalSave2">${opts.saveLabel||'Salva'}</button></div></div></div>`;
+  document.getElementById('modalHost2').innerHTML=h;document.getElementById('modalSave2').onclick=async()=>{try{await onSave();closeModal2();}catch(e){alert('Errore: '+(e.message||e))}};}
+function closeModal2(){document.getElementById('modalHost2').innerHTML=''}
 function f(label,id,value,type='text',opts){value=value==null?'':value;
   if(type==='select')return `<div class="field"><label>${label}</label><select id="${id}">${opts.map(o=>`<option ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
   if(type==='datalist')return `<div class="field"><label>${label}</label><input id="${id}" list="${id}_dl" value="${esc(value)}"><datalist id="${id}_dl">${opts.map(o=>`<option value="${esc(o)}">`).join('')}</datalist></div>`;
@@ -854,6 +865,20 @@ async function delUser(id,email){
 async function refOptions(table,labelFn){const rows=await store.list(table);return rows.map(r=>({id:r.id,label:labelFn(r)}))}
 
 /* COMPANY */
+function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
+    ${f('Ragione sociale *','co_name',co.name)}${f('P.IVA / N. IVA','co_vat',co.vat_number)}
+    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
+    ${f('Indirizzo','co_addr',co.address)}${f('CAP','co_zip',co.zip)}
+    ${f('Città','co_city',co.city)}${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
+    <div class="sec-title">Profilo aziendale</div>
+    ${f('Settore','co_sector',co.sector)}${f('N. dipendenti','co_emp',co.employees,'number')}
+    ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
+    ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
+    <div class="sec-title">Infrastruttura IT attuale</div>
+    ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
+    ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
+    ${f('Note','co_notes',co.notes,'textarea')}</div>`;}
+function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};}
 async function editCompany(id){const co=id?await store.get('companies',id):{};
   const ctypes=co.types||[];
   let related='';
@@ -891,7 +916,7 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
     ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
     ${f('Note','co_notes',co.notes,'textarea')}</div>${related}`,async()=>{
-    const o={name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};
+    const o=readCompanyForm();
     if(!o.name)throw new Error('Ragione sociale obbligatoria');id?await store.update('companies',id,o):await store.insert('companies',o);},{wide:true});}
 
 /* ===== SCHEDA SITUAZIONE CLIENTE ===== */
@@ -1171,12 +1196,13 @@ async function docForm(kind,id){
     DOC_CUR=newC;CUR=newC;recalc();});
   renderLines();}
 async function newPartyCompany(isSupplier){
-  const name=prompt('Ragione sociale della nuova azienda:');if(!name||!name.trim())return;
-  const city=(prompt('Città (facoltativo):')||'').trim();
-  try{const co=await store.insert('companies',{name:name.trim(),types:[isSupplier?'Fornitore':'Cliente'],city});
-    const sel=document.getElementById('dc_party');if(sel){const o=document.createElement('option');o.value=co.id;o.textContent=co.name;sel.appendChild(o);sel.value=co.id;}
-    toast('Azienda creata e selezionata. Potrai completarne i dettagli nella sezione Aziende.');
-  }catch(e){alert('Errore nella creazione: '+(e.message||e));}}
+  const type=isSupplier?'Fornitore':'Cliente';
+  openModal2('Nuova azienda',companyFieldsHtml({types:[type]}),async()=>{
+    const o=readCompanyForm();if(!o.name)throw new Error('Ragione sociale obbligatoria');
+    const co=await store.insert('companies',o);
+    const sel=document.getElementById('dc_party');if(sel){const op=document.createElement('option');op.value=co.id;op.textContent=co.name;sel.appendChild(op);sel.value=co.id;}
+    toast('Azienda creata e selezionata nel documento.');
+  },{wide:true,saveLabel:'Salva azienda'});}
 function addLine(vat){LINE_BUF.push({code:'',desc:'',qty:1,price:0,vat:vat||0});renderLines();}
 async function addFromCatalog(pid){if(!pid)return;collectLines();const p=await store.get('products',pid);if(p){if(LINE_BUF.length===1&&!LINE_BUF[0].desc&&!LINE_BUF[0].price)LINE_BUF=[];LINE_BUF.push({code:p.code||'',desc:p.name||'',qty:1,price:Number(p.unit_price)||0,vat:Number(p.vat)||0});renderLines();}}
 function collectLines(){LINE_BUF=[...document.querySelectorAll('#lineRows tr')].map(tr=>({code:tr.querySelector('.ln-code').value,desc:tr.querySelector('.ln-desc').value,qty:parseFloat(tr.querySelector('.ln-qty').value)||0,price:parseFloat(tr.querySelector('.ln-price').value)||0,vat:parseFloat(tr.querySelector('.ln-vat').value)||0,disc:parseFloat(tr.querySelector('.ln-disc').value)||0}));}
@@ -1220,12 +1246,11 @@ async function getDocCtx(kind,id){const cfg=DOC_CFG[kind];const doc=await store.
   const t=docTotals(doc);const vg={};(doc.lines||[]).forEach(l=>{const a=(l.qty||0)*(l.price||0);vg[l.vat]=(vg[l.vat]||0)+a*(l.vat||0)/100});
   const attachNames=(doc.documents||[]).map(did=>(allDocs.find(d=>d.id===did)||{}).name).filter(Boolean);
   return {cfg,doc,s,party,ct,bank,t,vg,attachNames,showDisc:!!doc.show_discount};}
-function docInnerHtml(ctx){const {cfg,doc,s,party,ct,bank,t,vg,attachNames,showDisc}=ctx;
-  return `<div class="dhd"><div class="co">
+function docHeadHtml(s){return `<div class="dhd"><div class="co">
        <div class="nm"><img src="${LOGO_DOC}" alt="${esc(s.name)}" style="height:46px;display:block"></div>
        <div style="font-weight:700;color:#1a1c22;font-size:13px;margin-top:8px">${esc(s.name)}</div>
-       <div class="ad" style="margin-top:6px">${esc(s.address)}<br>${esc(s.zip_city)}<br>Tax ID: ${esc(s.tax_id)}<br>Tel: ${esc(s.phone)}<br>email: ${esc(s.email)} | ${esc(s.website)}</div></div></div>
-     <div style="display:flex;margin:22px 0 6px"><div style="flex:1"></div><div style="width:50%">
+       <div class="ad" style="margin-top:6px">${esc(s.address)}<br>${esc(s.zip_city)}<br>Tax ID: ${esc(s.tax_id)}<br>Tel: ${esc(s.phone)}<br>email: ${esc(s.email)} | ${esc(s.website)}</div></div></div>`;}
+function docPartyMetaHtml(ctx){const {cfg,doc,party,ct}=ctx;return `<div style="display:flex;margin:22px 0 6px"><div style="flex:1"></div><div style="width:50%">
        <div class="lb">${esc((cfg.partyLabel||'Cliente').toUpperCase())}:</div>
        <div style="font-weight:700;font-size:15px;margin-top:4px">${esc(party.name||'—')}</div>
        <div style="color:#555;line-height:1.6">${party.address?esc(party.address)+'<br>':''}${esc((party.zip||'')+' '+(party.city||''))}${party.country?'<br>'+esc(party.country):''}</div>
@@ -1236,19 +1261,43 @@ function docInnerHtml(ctx){const {cfg,doc,s,party,ct,bank,t,vg,attachNames,showD
        <div><div class="lb">${esc(cfg.expLabel)}:</div><div class="vv">${dateIt(doc.expiry)}</div></div>
        <div><div class="lb">RIF. COMMERCIALE:</div><div class="vv">${esc(doc.commercial_ref||'—')}</div></div>
        ${ct?`<div><div class="lb">Vostro riferimento</div><div class="vv">${esc(ct.first_name+' '+ct.last_name)}</div></div>`:''}
-     </div>
-     <table class="it"><thead><tr><th style="text-align:left;width:74px">Codice</th><th style="text-align:left">Descrizione</th><th class="amt" style="width:42px">Q.tà</th><th class="amt" style="width:90px">Prezzo unit.</th>${showDisc?'<th class="amt" style="width:54px">Sconto</th>':''}<th class="amt" style="width:48px">Tasse</th><th class="amt" style="width:92px">Importo</th></tr></thead>
-       <tbody>${(doc.lines||[]).map(l=>{const amt=(l.qty||0)*(l.price||0)*(1-((l.disc||0)/100));return `<tr><td class="mono" style="font-size:11px;white-space:nowrap">${esc(l.code||'—')}</td><td class="desc">${esc(l.desc)}</td><td class="amt mono">${l.qty}</td><td class="amt mono">${pmoney(l.price)}</td>${showDisc?`<td class="amt mono">${(l.disc||0)?(l.disc+'%'):'—'}</td>`:''}<td class="amt mono">${l.vat}%</td><td class="amt mono">${pmoney(amt)}</td></tr>`;}).join('')}</tbody></table>
-     <div class="dtot"><div class="r"><span>Imponibile</span><span class="mono">${pmoney(t.net)}</span></div><div class="r"><span>Imposte</span><span class="mono">${pmoney(t.tax)}</span></div><div class="r big"><span>Totale</span><span class="mono">${pmoney(t.total)}</span></div></div>
-     <div class="notes"><div class="lb">Termini di pagamento</div><div>${esc(doc.payment_terms||'—')}</div>${bank?`<div class="lb" style="margin-top:12px">Coordinate bancarie</div><div>${esc(bank.holder||s.name)}<br>${esc(bank.bank||'')}<br>IBAN: ${esc(bank.iban||'')}${bank.swift?'<br>Codice SWIFT: '+esc(bank.swift):''}</div>`:''}${doc.notes?`<div class="lb" style="margin-top:12px">Note</div><div style="white-space:pre-line">${esc(doc.notes)}</div>`:''}${attachNames.length?`<div class="lb" style="margin-top:12px">Allegati</div><div>${attachNames.map(esc).join(', ')}</div>`:''}</div>
-     <div class="foot">${esc(s.name)} · ${esc(s.address)} · ${esc(s.zip_city)} · ${esc(s.tax_id)}</div>`;}
+     </div>`;}
+function docTableHead(showDisc){return `<thead><tr><th style="text-align:left;width:74px">Codice</th><th style="text-align:left">Descrizione</th><th class="amt" style="width:42px">Q.tà</th><th class="amt" style="width:90px">Prezzo unit.</th>${showDisc?'<th class="amt" style="width:42px">SC.</th>':''}<th class="amt" style="width:48px">IVA</th><th class="amt" style="width:92px">Importo</th></tr></thead>`;}
+function docRowHtml(l,showDisc){const amt=(l.qty||0)*(l.price||0)*(1-((l.disc||0)/100));return `<tr><td class="mono" style="font-size:11px;white-space:nowrap">${esc(l.code||'—')}</td><td class="desc">${esc(l.desc)}</td><td class="amt mono">${l.qty}</td><td class="amt mono">${pmoney(l.price)}</td>${showDisc?`<td class="amt mono">${(l.disc||0)?(l.disc+'%'):'—'}</td>`:''}<td class="amt mono">${l.vat}%</td><td class="amt mono">${pmoney(amt)}</td></tr>`;}
+function docTotalsHtml(t){return `<div class="dtot"><div class="r"><span>Imponibile</span><span class="mono">${pmoney(t.net)}</span></div><div class="r"><span>IVA</span><span class="mono">${pmoney(t.tax)}</span></div><div class="r big"><span>Totale</span><span class="mono">${pmoney(t.total)}</span></div></div>`;}
+function docNotesHtml(ctx){const {doc,bank,s,attachNames}=ctx;return `<div class="notes"><div class="lb">Termini di pagamento</div><div>${esc(doc.payment_terms||'—')}</div>${bank?`<div class="lb" style="margin-top:12px">Coordinate bancarie</div><div>${esc(bank.holder||s.name)}<br>${esc(bank.bank||'')}<br>IBAN: ${esc(bank.iban||'')}${bank.swift?'<br>Codice SWIFT: '+esc(bank.swift):''}</div>`:''}${doc.notes?`<div class="lb" style="margin-top:12px">Note</div><div style="white-space:pre-line">${esc(doc.notes)}</div>`:''}${attachNames.length?`<div class="lb" style="margin-top:12px">Allegati</div><div>${attachNames.map(esc).join(', ')}</div>`:''}</div>`;}
+function docFootLine(s){return `${esc(s.name)} · ${esc(s.address)} · ${esc(s.zip_city)} · ${esc(s.tax_id)}`;}
+function docInnerHtml(ctx){const {s,doc,t,showDisc}=ctx;
+  return docHeadHtml(s)+docPartyMetaHtml(ctx)+'<table class="it">'+docTableHead(showDisc)+'<tbody>'+(doc.lines||[]).map(l=>docRowHtml(l,showDisc)).join('')+'</tbody></table>'+docTotalsHtml(t)+docNotesHtml(ctx)+`<div class="foot">${docFootLine(s)}</div>`;}
+function docPagesHtml(ctx){const {s,doc,t,showDisc}=ctx;
+  const USABLE=945,PW=682;
+  const head=docHeadHtml(s),partyMeta=docPartyMetaHtml(ctx),totals=docTotalsHtml(t),notes=docNotesHtml(ctx),footLine=docFootLine(s);
+  const rowsArr=(doc.lines||[]).map(l=>docRowHtml(l,showDisc));
+  const meas=document.createElement('div');meas.className='doc';meas.style.cssText='position:absolute;left:-99999px;top:0;width:'+PW+'px;padding:0;max-width:none';document.body.appendChild(meas);
+  let firstH,theadH,rowH=[],totalsH,notesH;
+  try{
+    meas.innerHTML=head+partyMeta;firstH=meas.offsetHeight;
+    meas.innerHTML='<table class="it">'+docTableHead(showDisc)+'<tbody>'+(rowsArr.join('')||'<tr><td>&nbsp;</td></tr>')+'</tbody></table>';
+    theadH=(meas.querySelector('thead')||{}).offsetHeight||30;rowH=[...meas.querySelectorAll('tbody tr')].map(tr=>tr.offsetHeight);
+    meas.innerHTML=totals;totalsH=meas.offsetHeight;meas.innerHTML=notes;notesH=meas.offsetHeight;
+  }finally{document.body.removeChild(meas);}
+  const pages=[];let cur={first:true,rows:[]};let avail=USABLE-firstH-theadH;
+  rowsArr.forEach((_,i)=>{const h=rowH[i]||30;if(h>avail&&cur.rows.length){pages.push(cur);cur={first:false,rows:[]};avail=USABLE-theadH;}cur.rows.push(i);avail-=h;});
+  if(totalsH>avail){pages.push(cur);cur={first:false,rows:[]};avail=USABLE;}cur.totals=true;avail-=totalsH;
+  if(notesH>avail){pages.push(cur);cur={first:false,rows:[]};avail=USABLE;}cur.notes=true;
+  pages.push(cur);const N=pages.length;
+  return pages.map((p,idx)=>{let body='';if(p.first)body+=head+partyMeta;
+    if(p.rows.length)body+='<table class="it">'+docTableHead(showDisc)+'<tbody>'+p.rows.map(i=>rowsArr[i]).join('')+'</tbody></table>';
+    if(p.totals)body+=totals;if(p.notes)body+=notes;
+    return `<div class="page"><div class="doc" style="padding:0;max-width:none">${body}</div><div class="pfoot"><span>${footLine}</span><span class="pno">${N>1?(idx+1)+' / '+N:''}</span></div></div>`;
+  }).join('');}
 let PRINT_CTX=null;
 async function printDoc(kind,id){const ctx=await getDocCtx(kind,id);PRINT_CTX=ctx;
   document.getElementById('printroot').innerHTML=`
    <div class="printbar"><b>Anteprima ${ctx.cfg.label}</b><div class="spacer"></div><button id="discToggleBtn" class="btn ghost sm" style="color:#fff;border-color:#444" onclick="toggleDocDisc()">${ctx.showDisc?'Nascondi sconto':'Mostra sconto'}</button><button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div>
-   <div class="doc">${docInnerHtml(ctx)}</div>`;
+   <div id="docpages">${docPagesHtml(ctx)}</div>`;
   document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';closeModal();}
-function toggleDocDisc(){if(!PRINT_CTX)return;PRINT_CTX.showDisc=!PRINT_CTX.showDisc;const d=document.querySelector('#printroot .doc');if(d)d.innerHTML=docInnerHtml(PRINT_CTX);const b=document.getElementById('discToggleBtn');if(b)b.textContent=PRINT_CTX.showDisc?'Nascondi sconto':'Mostra sconto';}
+function toggleDocDisc(){if(!PRINT_CTX)return;PRINT_CTX.showDisc=!PRINT_CTX.showDisc;const d=document.getElementById('docpages');if(d)d.innerHTML=docPagesHtml(PRINT_CTX);const b=document.getElementById('discToggleBtn');if(b)b.textContent=PRINT_CTX.showDisc?'Nascondi sconto':'Mostra sconto';}
 function closePrint(){document.getElementById('printroot').style.display='none';document.getElementById('printroot').innerHTML='';document.getElementById('app').style.display='block';}
 function printNow(){const t=document.title;document.title='';const restore=()=>{document.title=t;window.removeEventListener('afterprint',restore);};window.addEventListener('afterprint',restore);setTimeout(restore,3000);window.print();}
 
