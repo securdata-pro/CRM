@@ -783,7 +783,10 @@ VIEWS.purchase_orders=async(c)=>{const [orders,companies]=await Promise.all([sto
 
 /* ===== DOCUMENTS ===== */
 VIEWS.documents=async(c)=>{const allDocs=await store.list('documents');
-  const CATS=['Schede tecniche','Contratti','Listini','Offerte','Certificazioni','Documenti legali','Altro'];
+  const s=await store.settings();
+  const DEFAULT_CATS=['Schede tecniche','Contratti','Listini','Offerte','Certificazioni','Documenti legali','Altro'];
+  let CATS;try{CATS=Array.isArray(s.doc_categories)?s.doc_categories:(s.doc_categories?JSON.parse(s.doc_categories):null);}catch(e){CATS=null;}
+  if(!CATS||!CATS.length)CATS=DEFAULT_CATS;
   const icon=d=>d.type&&d.type.includes('pdf')?'📕':d.type&&d.type.includes('image')?'🖼':'📄';
   // filtro per categoria
   let docs=DOC_CAT==='Tutte'?allDocs:allDocs.filter(d=>(d.category||'Altro')===DOC_CAT);
@@ -800,7 +803,35 @@ VIEWS.documents=async(c)=>{const allDocs=await store.list('documents');
   c.innerHTML=`<div class="toolbar">${searchBox('Cerca documento…','sDoc')}<button class="btn sm" onclick="editDocument()">＋ Carica documento</button>
     <select class="btn ghost sm" onchange="setDocCat(this.value)" style="cursor:pointer">${catOpts}</select>
     <select class="btn ghost sm" onchange="setDocSort(this.value)" style="cursor:pointer">${sortOpts}</select>
+    <button class="btn ghost sm" onclick="manageDocCategories()">⚙ Categorie</button>
     <span style="color:var(--muted);font-size:12.5px;margin-left:8px">${docs.length} documenti</span></div>${cards}`;};
+
+async function getDocCategories(){const s=await store.settings();const DEF=['Schede tecniche','Contratti','Listini','Offerte','Certificazioni','Documenti legali','Altro'];let c;try{c=Array.isArray(s.doc_categories)?s.doc_categories:(s.doc_categories?JSON.parse(s.doc_categories):null);}catch(e){c=null;}return (c&&c.length)?c:DEF;}
+async function manageDocCategories(){
+  const cats=await getDocCategories();
+  const listHtml=cats.map((cat,ix)=>`<div class="urow" style="padding:8px 12px"><div class="uinfo"><b>${esc(cat)}</b></div><button class="del-btn" onclick="removeDocCategory(${ix})">Rimuovi</button></div>`).join('');
+  openModal('Categorie documenti',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Aggiungi o rimuovi le categorie usate per organizzare i documenti.</div>
+    <div class="userlist" id="catList">${listHtml||'<div class="empty" style="padding:12px">Nessuna categoria.</div>'}</div>
+    <div style="display:flex;gap:8px;margin-top:12px"><input id="newCat" placeholder="Nuova categoria…" style="flex:1"><button class="btn" type="button" onclick="addDocCategory()">+ Aggiungi</button></div>`,
+    null,{saveLabel:'Chiudi',extra:''});
+  // il pulsante Salva qui funge solo da chiudi
+  const sv=document.getElementById('modalSave');if(sv)sv.onclick=()=>{closeModal();render();};
+}
+async function addDocCategory(){
+  const inp=document.getElementById('newCat');const v=(inp.value||'').trim();if(!v)return;
+  const cats=await getDocCategories();
+  if(cats.some(x=>x.toLowerCase()===v.toLowerCase())){toast('Categoria già presente');return;}
+  cats.push(v);
+  await store.saveSettings({doc_categories:JSON.stringify(cats)});
+  manageDocCategories();
+}
+async function removeDocCategory(ix){
+  const cats=await getDocCategories();const removed=cats[ix];
+  if(!confirm('Rimuovere la categoria "'+removed+'"? I documenti che la usano resteranno, mostrati sotto "Altro".'))return;
+  cats.splice(ix,1);
+  await store.saveSettings({doc_categories:JSON.stringify(cats)});
+  manageDocCategories();
+}
 
 /* ===== BANKS ===== */
 VIEWS.banks=async(c)=>{const banks=await store.list('banks');
@@ -1279,9 +1310,9 @@ async function editUser(id){const users=await store.list('app_users');const u=id
 function toggleSuper(){const on=gv('us_super');const w=document.getElementById('modWrap');if(w)w.style.display=on?'none':'';}
 
 /* DOCUMENT (repository) */
-async function editDocument(id){const d=id?await store.get('documents',id):{};
+async function editDocument(id){const d=id?await store.get('documents',id):{};const cats=await getDocCategories();
   openModal(id?'Modifica documento':'Carica documento',`<div class="fgrid">
-    ${f('Nome documento *','dc_name',d.name)}${f('Categoria','dc_cat',d.category||'Altro','select',['Schede tecniche','Contratti','Listini','Offerte','Certificazioni','Documenti legali','Altro'])}
+    ${f('Nome documento *','dc_name',d.name)}${f('Categoria','dc_cat',d.category||cats[0]||'Altro','select',cats)}
     ${f('Tag','dc_tags',d.tags)}
     <div class="field full"><label>File ${id?'(lascia vuoto per mantenere)':''}</label><input id="dc_file" type="file"></div>
     <div class="full callout">Per la demo locale i file vengono salvati nel browser: tieni i file piccoli (consigliato &lt; 1,5 MB). In modalità Supabase conviene usare Supabase Storage (posso integrarlo).</div>
