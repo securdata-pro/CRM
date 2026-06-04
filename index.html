@@ -948,18 +948,16 @@ async function zefixPick(i){
   // Seconda chiamata: dettaglio azienda per recuperare le persone con poteri di firma
   const uid=(c.uid||'').replace(/[^0-9A-Za-z]/g,'');
   if(uid&&ZEFIX_FN){
-    const sig=document.getElementById('co_signatories');
-    if(sig&&!sig.value.trim()){
-      try{
-        const headers={'Content-Type':'application/json'};if(typeof SB_KEY!=='undefined'&&SB_KEY){headers['Authorization']='Bearer '+SB_KEY;headers['apikey']=SB_KEY;}
-        const r=await fetch(ZEFIX_FN,{method:'POST',headers,body:JSON.stringify({uid:c.uid})});
-        if(r.ok){const d=await r.json();const people=(d&&d.signatories)||[];
-          if(people.length){sig.value=people.map(p=>p.name+(p.role?' — '+p.role:'')+(p.signature?' ('+p.signature+')':'')).join('\n');if(typeof toast==='function')toast(people.length+' persone con poteri inserite');}
-        }
-      }catch(e){}
-    }
+    try{
+      const headers={'Content-Type':'application/json'};if(typeof SB_KEY!=='undefined'&&SB_KEY){headers['Authorization']='Bearer '+SB_KEY;headers['apikey']=SB_KEY;}
+      const r=await fetch(ZEFIX_FN,{method:'POST',headers,body:JSON.stringify({uid:c.uid})});
+      if(r.ok){const d=await r.json();const people=(d&&d.signatories)||[];
+        if(people.length){ZFX_PENDING_SIG=people;if(typeof toast==='function')toast(people.length+' persone con poteri pronte (salva per memorizzarle)');}
+      }
+    }catch(e){}
   }
 }
+let ZFX_PENDING_SIG=null;
 function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
     <div class="field"><label>Ragione sociale *</label><div style="position:relative"><input id="co_name" value="${esc(co.name||'')}" autocomplete="off" oninput="zefixSearch()" placeholder="Inizia a digitare (ricerca su Zefix)…"><div id="zefixBox" class="zefix-box"></div></div></div>${f('P.IVA / N. IVA','co_vat',co.vat_number)}
     <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
@@ -973,9 +971,8 @@ function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgr
     <div class="sec-title">Infrastruttura IT attuale</div>
     ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
     ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
-    ${f('Persone con poteri','co_signatories',co.signatories,'textarea')}
     ${f('Note','co_notes',co.notes,'textarea')}</div>`;}
-function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),phone:gv('co_phone'),email:gv('co_email'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),signatories:gv('co_signatories'),notes:gv('co_notes')};}
+function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),phone:gv('co_phone'),email:gv('co_email'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};}
 async function editCompany(id){const co=id?await store.get('companies',id):{};
   const ctypes=co.types||[];
   let related='';
@@ -990,7 +987,10 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     const row=(arr,fn)=>arr.length?arr.map(fn).join(''):'<tr><td colspan="4" class="empty" style="padding:14px">—</td></tr>';
     const contactsCard=`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Contatti</div>
       <div class="card" style="margin-bottom:12px"><div class="hd"><h3>Persone associate</h3><div class="spacer"></div><span style="font-size:12px;color:var(--muted)">${cts.length} contatti</span></div><div class="bd"><table><thead><tr><th>Nome</th><th>Ruolo</th><th>Tel. Ufficio</th><th>Mobile</th><th>Email</th></tr></thead><tbody>${cts.length?cts.map(p=>`<tr onclick="closeModal();editContact('${p.id}')"><td><b>${esc((p.first_name+' '+p.last_name).trim())}</b></td><td>${esc(p.role_title||'—')}</td><td>${esc(p.phone||'—')}</td><td>${esc(p.mobile||'—')}</td><td>${p.email?`<a href="mailto:${esc(p.email)}" onclick="event.stopPropagation()">${esc(p.email)}</a>`:'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty" style="padding:14px">Nessun contatto associato.</td></tr>'}</tbody></table></div></div>`;
-    related=contactsCard+`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Situazione documenti</div>
+    let sig=[];try{sig=Array.isArray(co.signatories)?co.signatories:(co.signatories?JSON.parse(co.signatories):[]);}catch(e){sig=[];}
+    const sigCard=`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Persone con poteri di firma</div>
+      <div class="card" style="margin-bottom:12px"><div class="hd"><h3>Poteri di firma</h3><div class="spacer"></div><button class="btn sm" onclick="addSignatory('${id}')">+ Aggiungi</button></div><div class="bd"><table><thead><tr><th>Nome e cognome</th><th>Funzione</th><th>Modalità di firma</th><th></th></tr></thead><tbody>${sig.length?sig.map((p,ix)=>`<tr><td><b>${esc(p.name||'')}</b></td><td>${esc(p.role||'—')}</td><td>${esc(p.signature||'—')}</td><td class="rowact"><button class="iconbtn" title="Elimina" onclick="delSignatory('${id}',${ix})">🗑</button></td></tr>`).join(''):'<tr><td colspan="4" class="empty" style="padding:14px">Nessuna persona con poteri di firma. Usa "+ Aggiungi" per inserirle.</td></tr>'}</tbody></table></div></div>`;
+    related=contactsCard+sigCard+`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Situazione documenti</div>
       <div class="kpis" style="margin:0 0 14px">
         <div class="kpi"><div class="lab">Preventivi aperti</div><div class="val">${openQ}<small> / ${qs.length}</small></div></div>
         <div class="kpi"><div class="lab">Valore preventivi</div><div class="val">${moneyShort(totQ)}</div></div>
@@ -1018,7 +1018,32 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
     ${f('Note','co_notes',co.notes,'textarea')}</div>${related}`,async()=>{
     const o=readCompanyForm();
-    if(!o.name)throw new Error('Ragione sociale obbligatoria');id?await store.update('companies',id,o):await store.insert('companies',o);},{wide:true});}
+    if(!o.name)throw new Error('Ragione sociale obbligatoria');
+    if(ZFX_PENDING_SIG&&ZFX_PENDING_SIG.length){o.signatories=JSON.stringify(ZFX_PENDING_SIG);ZFX_PENDING_SIG=null;}
+    id?await store.update('companies',id,o):await store.insert('companies',o);},{wide:true});}
+
+async function getSignatories(companyId){const co=await store.get('companies',companyId);let s=[];try{s=Array.isArray(co.signatories)?co.signatories:(co.signatories?JSON.parse(co.signatories):[]);}catch(e){s=[];}return {co,list:s};}
+async function addSignatory(companyId){
+  openModal2('Persona con poteri di firma',`<div class="fgrid">
+    ${f('Nome e cognome *','sg_name','')}
+    ${f('Funzione','sg_role','','datalist',['socio','socio e presidente della gerenza','socio e gerente','gerente','presidente della gerenza','direttore','procuratore','membro della direzione'])}
+    ${f('Modalità di firma','sg_sign','','datalist',['firma individuale','firma collettiva a due','firma collettiva a tre','senza diritto di firma','procura'])}
+  </div>`,async()=>{
+    const name=gv('sg_name').trim();if(!name)throw new Error('Il nome è obbligatorio');
+    const {list}=await getSignatories(companyId);
+    list.push({name,role:gv('sg_role').trim(),signature:gv('sg_sign').trim()});
+    await store.update('companies',companyId,{signatories:JSON.stringify(list)});
+    closeModal2();companyDossierReopen(companyId);
+  });
+}
+async function delSignatory(companyId,ix){
+  if(!confirm('Eliminare questa persona dai poteri di firma?'))return;
+  const {list}=await getSignatories(companyId);
+  list.splice(ix,1);
+  await store.update('companies',companyId,{signatories:JSON.stringify(list)});
+  companyDossierReopen(companyId);
+}
+function companyDossierReopen(companyId){closeModal();editCompany(companyId);}
 
 /* ===== SCHEDA SITUAZIONE CLIENTE ===== */
 function qStatusPill(s){const c=s==='Accettato'?'g':s==='Rifiutato'?'r':s==='Inviato'?'b':'n';return `<span class="pill ${c}">${esc(s||'—')}</span>`;}
