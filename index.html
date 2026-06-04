@@ -980,14 +980,17 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
   const ctypes=co.types||[];
   let related='';
   if(id){const s=await store.settings();CUR=s.currency||CUR;
-    const [quotes,sorders,invoices,porders]=await Promise.all([store.list('quotes'),store.list('sales_orders'),store.list('invoices'),store.list('purchase_orders')]);
+    const [quotes,sorders,invoices,porders,contacts]=await Promise.all([store.list('quotes'),store.list('sales_orders'),store.list('invoices'),store.list('purchase_orders'),store.list('contacts')]);
     const qs=quotes.filter(q=>q.company===id),os=sorders.filter(o=>o.company===id),is=invoices.filter(x=>x.company===id),pos=porders.filter(o=>o.supplier===id);
+    const cts=contacts.filter(p=>p.company===id);
     const totQ=qs.reduce((a,q)=>a+docTotals(q).total,0),totI=is.reduce((a,x)=>a+docTotals(x).total,0);
     const totPaid=is.filter(x=>x.status==='Pagata').reduce((a,x)=>a+docTotals(x).total,0);
     const openQ=qs.filter(q=>q.status==='Bozza'||q.status==='Inviato').length;
     const openO=os.filter(o=>o.status==='Aperto'||o.status==='In lavorazione').length;
     const row=(arr,fn)=>arr.length?arr.map(fn).join(''):'<tr><td colspan="4" class="empty" style="padding:14px">—</td></tr>';
-    related=`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Situazione documenti</div>
+    const contactsCard=`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Contatti</div>
+      <div class="card" style="margin-bottom:12px"><div class="hd"><h3>Persone associate</h3><div class="spacer"></div><span style="font-size:12px;color:var(--muted)">${cts.length} contatti</span></div><div class="bd"><table><thead><tr><th>Nome</th><th>Ruolo</th><th>Tel. Ufficio</th><th>Mobile</th><th>Email</th></tr></thead><tbody>${cts.length?cts.map(p=>`<tr onclick="closeModal();editContact('${p.id}')"><td><b>${esc((p.first_name+' '+p.last_name).trim())}</b></td><td>${esc(p.role_title||'—')}</td><td>${esc(p.phone||'—')}</td><td>${esc(p.mobile||'—')}</td><td>${p.email?`<a href="mailto:${esc(p.email)}" onclick="event.stopPropagation()">${esc(p.email)}</a>`:'—'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty" style="padding:14px">Nessun contatto associato.</td></tr>'}</tbody></table></div></div>`;
+    related=contactsCard+`<div class="sec-title" style="margin-top:20px;color:var(--ink)">Situazione documenti</div>
       <div class="kpis" style="margin:0 0 14px">
         <div class="kpi"><div class="lab">Preventivi aperti</div><div class="val">${openQ}<small> / ${qs.length}</small></div></div>
         <div class="kpi"><div class="lab">Valore preventivi</div><div class="val">${moneyShort(totQ)}</div></div>
