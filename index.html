@@ -663,9 +663,10 @@ VIEWS.pipeline=async(c)=>{const [leads,companies]=await Promise.all([store.list(
 
 let COMP_FILTER='Tutti';
 function setCompFilter(t){COMP_FILTER=t;render();}
-let DOC_CAT='Tutte';let DOC_SORT='recenti';
+let DOC_CAT='Tutte';let DOC_SORT='recenti';let DOC_SORT_FIELD='created_at';let DOC_SORT_DIR='desc';
 function setDocCat(v){DOC_CAT=v;render();}
-function setDocSort(v){DOC_SORT=v;render();}
+function setDocSort(v){DOC_SORT=v;DOC_SORT_FIELD='created_at';DOC_SORT_DIR=(v==='recenti')?'desc':'asc';render();}
+function setDocSortCol(field){if(DOC_SORT_FIELD===field){DOC_SORT_DIR=(DOC_SORT_DIR==='asc')?'desc':'asc';}else{DOC_SORT_FIELD=field;DOC_SORT_DIR='asc';}render();}
 function typePill(t){const c=t==='Cliente'?'g':t==='Fornitore'?'a':t==='Lead'?'b':'n';return `<span class="pill ${c}">${esc(t)}</span>`;}
 const COMP_COLS=[
  {id:'types',label:'Tipo',cell:co=>(co.types||[]).map(typePill).join(' ')||'—'},
@@ -790,13 +791,15 @@ VIEWS.documents=async(c)=>{const allDocs=await store.list('documents');
   const icon=d=>d.type&&d.type.includes('pdf')?'📕':d.type&&d.type.includes('image')?'🖼':'📄';
   // filtro per categoria
   let docs=DOC_CAT==='Tutte'?allDocs:allDocs.filter(d=>(d.category||'Altro')===DOC_CAT);
-  // ordinamento per data di caricamento
-  docs=docs.slice().sort((a,b)=>{const da=new Date(a.created_at||0),db=new Date(b.created_at||0);return DOC_SORT==='recenti'?db-da:da-db;});
+  // ordinamento per campo e direzione (si applica anche dentro ogni categoria)
+  const sortVal=(d)=>{const f=DOC_SORT_FIELD;if(f==='created_at')return new Date(d.created_at||0).getTime();if(f==='size')return Number(d.size||0);if(f==='category')return (d.category||'Altro').toLowerCase();return (d.name||'').toLowerCase();};
+  docs=docs.slice().sort((a,b)=>{const va=sortVal(a),vb=sortVal(b);let r=va<vb?-1:va>vb?1:0;return DOC_SORT_DIR==='asc'?r:-r;});
   const docRow=d=>`<tr data-s="${esc((d.name+' '+(d.tags||'')+' '+(d.category||'')).toLowerCase())}"><td><span style="display:inline-flex;align-items:center;gap:8px"><span style="font-size:18px">${icon(d)}</span><span><b>${esc(d.name)}</b>${d.tags?`<br><span style="color:var(--muted);font-size:11.5px">${esc(d.tags)}</span>`:''}</span></span></td><td>${esc(d.category||'Altro')}</td><td class="num">${d.size?(Math.round(d.size/1024)+' KB'):'—'}</td><td>${dateIt(d.created_at)}</td><td class="rowact">${d.data?`<a class="iconbtn" title="Scarica" href="${d.data}" download="${esc(d.name)}">⭳</a>`:''}<button class="iconbtn" onclick="editDocument('${d.id}')">✎</button><button class="iconbtn" onclick="delRow('documents','${d.id}')">🗑</button></td></tr>`;
   // raggruppo per categoria, mantenendo l'ordine CATS e mettendo eventuali categorie sconosciute in fondo
   const groups={};docs.forEach(d=>{const cat=d.category||'Altro';(groups[cat]=groups[cat]||[]).push(d);});
   const orderedCats=[...CATS.filter(k=>groups[k]),...Object.keys(groups).filter(k=>!CATS.includes(k))];
-  const thead=`<thead><tr><th style="text-align:left">Documento</th><th style="text-align:left">Tipologia</th><th class="num">Dimensione</th><th style="text-align:left">Data caricamento</th><th></th></tr></thead>`;
+  const arrow=f=>DOC_SORT_FIELD===f?(DOC_SORT_DIR==='asc'?' ▲':' ▼'):'';
+  const thead=`<thead><tr><th style="text-align:left;cursor:pointer" onclick="setDocSortCol('name')">Documento${arrow('name')}</th><th style="text-align:left;cursor:pointer" onclick="setDocSortCol('category')">Tipologia${arrow('category')}</th><th class="num" style="cursor:pointer" onclick="setDocSortCol('size')">Dimensione${arrow('size')}</th><th style="text-align:left;cursor:pointer" onclick="setDocSortCol('created_at')">Data caricamento${arrow('created_at')}</th><th></th></tr></thead>`;
   const cards=docs.length?orderedCats.map(cat=>`<div class="card" style="margin-bottom:14px"><div class="hd"><h3>${esc(cat)}</h3><div class="spacer"></div><span style="font-size:12px;color:var(--muted)">${groups[cat].length}</span></div><div class="bd" style="padding:0"><table>${thead}<tbody>${groups[cat].map(docRow).join('')}</tbody></table></div></div>`).join(''):`<div class="card"><div class="bd"><div class="empty">${allDocs.length?'Nessun documento in questa categoria.':'Nessun documento. Carica il primo con "＋ Carica documento": schede tecniche, contratti, listini…'}</div></div></div>`;
   const catOpts=['Tutte',...CATS].map(k=>`<option value="${k}" ${DOC_CAT===k?'selected':''}>${k==='Tutte'?'Tutte le tipologie':k}</option>`).join('');
   const sortOpts=`<option value="recenti" ${DOC_SORT==='recenti'?'selected':''}>Più recenti prima</option><option value="vecchi" ${DOC_SORT==='vecchi'?'selected':''}>Meno recenti prima</option>`;
