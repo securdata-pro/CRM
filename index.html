@@ -707,14 +707,34 @@ const CON_COLS=[
  {id:'contact',label:'Contatti',cell:p=>`<span style="font-size:12.5px">${esc(p.email||'')}<br>${esc(p.mobile||p.phone||'')}</span>`}
 ];
 function conColsKey(){return 'securgest_concols_'+((CURRENT_USER&&CURRENT_USER.email)||'')}
+let CON_FILT_CO='Tutte';let CON_FILT_ROLE='Tutti';
+function setConFiltCo(v){CON_FILT_CO=v;render();}
+function setConFiltRole(v){CON_FILT_ROLE=v;render();}
 function getConCols(){try{const v=JSON.parse(LS.get(conColsKey())||'null');if(Array.isArray(v)&&v.length)return v;}catch(e){}return ['company','role','authority','contact'];}
 function conColsCustomize(){const sel=getConCols();openModal('Colonne elenco contatti',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Scegli quali colonne mostrare nell'elenco contatti (la colonna "Nome" è sempre presente).</div><div class="checks" style="grid-template-columns:repeat(3,1fr)">${CON_COLS.map(co=>`<label class="${sel.includes(co.id)?'on':''}"><input type="checkbox" class="cncol" value="${co.id}" ${sel.includes(co.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(co.label)}</label>`).join('')}</div>`,async()=>{const ids=[...document.querySelectorAll('.cncol:checked')].map(x=>x.value);LS.set(conColsKey(),JSON.stringify(ids));},{saveLabel:'Applica'});}
 VIEWS.contacts=async(c)=>{const [contacts,companies]=await Promise.all([store.list('contacts'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
   const selIds=getConCols();const cols=CON_COLS.filter(x=>selIds.includes(x.id));
   const headHtml=cols.map(x=>`<th>${esc(x.label)}</th>`).join('');
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca contatto…','sCon')}<button class="btn ghost sm" onclick="conColsCustomize()">⚙ Colonne</button><button class="btn sm" onclick="editContact()">+ Nuovo contatto</button><span style="color:var(--muted);font-size:12.5px">${contacts.length} contatti</span></div>
+  // opzioni filtro: aziende che hanno almeno un contatto, e ruoli presenti
+  const coNames=[...new Set(contacts.map(p=>(comp[p.company]||{}).name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const roles=[...new Set(contacts.map(p=>p.role_title).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  // applico i filtri
+  let list=contacts.filter(p=>{
+    const coName=(comp[p.company]||{}).name||'';
+    if(CON_FILT_CO!=='Tutte'&&coName!==CON_FILT_CO)return false;
+    if(CON_FILT_ROLE!=='Tutti'&&(p.role_title||'')!==CON_FILT_ROLE)return false;
+    return true;
+  });
+  // ordino per azienda, poi per cognome
+  list=list.slice().sort((a,b)=>{const ca=((comp[a.company]||{}).name||'').toLowerCase(),cb=((comp[b.company]||{}).name||'').toLowerCase();if(ca!==cb)return ca<cb?-1:1;return (a.last_name||'').toLowerCase().localeCompare((b.last_name||'').toLowerCase());});
+  const coOpts=['Tutte',...coNames].map(k=>`<option value="${esc(k)}" ${CON_FILT_CO===k?'selected':''}>${k==='Tutte'?'Tutte le aziende':esc(k)}</option>`).join('');
+  const roleOpts=['Tutti',...roles].map(k=>`<option value="${esc(k)}" ${CON_FILT_ROLE===k?'selected':''}>${k==='Tutti'?'Tutti i ruoli':esc(k)}</option>`).join('');
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca contatto…','sCon')}<button class="btn ghost sm" onclick="conColsCustomize()">⚙ Colonne</button><button class="btn sm" onclick="editContact()">+ Nuovo contatto</button>
+  <select class="btn ghost sm" onchange="setConFiltCo(this.value)" style="cursor:pointer">${coOpts}</select>
+  <select class="btn ghost sm" onchange="setConFiltRole(this.value)" style="cursor:pointer">${roleOpts}</select>
+  <span style="color:var(--muted);font-size:12.5px;margin-left:8px">${list.length} contatti</span></div>
   <div class="card"><table><thead><tr><th>Nome</th>${headHtml}<th></th></tr></thead><tbody>${
-  contacts.map(p=>`<tr data-s="${esc((p.first_name+' '+p.last_name+' '+(comp[p.company]||{}).name+' '+p.role_title).toLowerCase())}" onclick="editContact('${p.id}')"><td><b>${esc(p.first_name+' '+p.last_name)}</b></td>${cols.map(x=>`<td>${x.cell(p,comp)}</td>`).join('')}<td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('contacts','${p.id}')">🗑</button></td></tr>`).join('')||`<tr><td colspan="${cols.length+2}" class="empty">Nessun contatto.</td></tr>`}</tbody></table></div>`;};
+  list.map(p=>`<tr data-s="${esc((p.first_name+' '+p.last_name+' '+(comp[p.company]||{}).name+' '+p.role_title).toLowerCase())}" onclick="editContact('${p.id}')"><td><b>${esc(p.first_name+' '+p.last_name)}</b></td>${cols.map(x=>`<td>${x.cell(p,comp)}</td>`).join('')}<td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('contacts','${p.id}')">🗑</button></td></tr>`).join('')||`<tr><td colspan="${cols.length+2}" class="empty">Nessun contatto${(CON_FILT_CO!=='Tutte'||CON_FILT_ROLE!=='Tutti')?' con questi filtri':''}.</td></tr>`}</tbody></table></div>`;};
 
 /* ===== LICENSES / PRODUCTS ===== */
 VIEWS.licenses=async(c)=>{const [lic,companies,products]=await Promise.all([store.list('licenses'),store.list('companies'),store.list('products')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));const prod=Object.fromEntries(products.map(x=>[x.id,x]));
