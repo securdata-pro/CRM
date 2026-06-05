@@ -979,6 +979,7 @@ VIEWS.settings=async(c)=>{
   </div></div>
   <div class="card" style="margin-top:18px"><div class="hd"><h3>Dati & backup</h3></div><div class="bd" style="padding:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <button class="btn ghost sm" onclick="exportData()">⭳ Esporta tutto (JSON)</button>
+    <button class="btn ghost sm" onclick="importCompanies()">⭱ Importa aziende (Excel/CSV)</button>
     ${MODE==='demo'?'<button class="btn ghost sm" onclick="resetDemo()">↺ Ripristina dati demo</button>':''}
     <span style="color:var(--muted);font-size:12.5px">Modalità: <b>${MODE==='demo'?'demo locale (browser)':'Supabase (cloud)'}</b></span>
   </div></div>`;};
@@ -1782,6 +1783,64 @@ function twofaReminder(){document.getElementById('modalHost').innerHTML=`<div cl
 async function logout(){try{if(MODE==='supabase'&&SB)await SB.auth.signOut();}catch(e){}LS.del('securgest_mode');LS.del('securgest_user');location.reload();}
 async function resetDemo(){if(!confirm('Ripristinare i dati demo iniziali?'))return;await store.reset();render();toast('Dati demo ripristinati');}
 async function exportData(){const tables=['companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','documents','banks','app_users'];const out={settings:await store.settings()};for(const t of tables)out[t]=await store.list(t);const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='securgest-export.json';a.click();}
+
+/* ===== IMPORT AZIENDE da Excel/CSV ===== */
+let IMP_CO=[];
+function importCompanies(){
+  IMP_CO=[];
+  openModal('Importa aziende',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Carica un file Excel (.xlsx) o CSV con le aziende. Colonne riconosciute: <b>Nome</b> (o Ragione sociale), Indirizzo, CAP, Città, Paese, Telefono, Email, P.IVA. Le aziende con un nome già presente vengono saltate.</div>
+    <div class="field"><label>File aziende (.xlsx, .csv)</label><input id="impFile" type="file" accept=".xlsx,.xls,.csv"></div>
+    <div style="display:flex;gap:8px;margin:8px 0"><button class="btn sm" type="button" id="impAnalyze" onclick="impAnalyze()">Analizza file</button></div>
+    <div id="impStatus" style="font-size:12.5px;color:var(--muted)"></div>
+    <div id="impPreview"></div>`,null,{wide:true,saveLabel:'Chiudi'});
+  const sv=document.getElementById('modalSave');if(sv)sv.onclick=()=>{closeModal();render();};
+}
+function impPick(hdr,...keys){for(const k of keys){const i=hdr.findIndex(h=>h===k);if(i>=0)return i;}for(const k of keys){const i=hdr.findIndex(h=>h.includes(k));if(i>=0)return i;}return -1;}
+async function impAnalyze(){
+  const fe=document.getElementById('impFile');const st=document.getElementById('impStatus');
+  if(!fe.files||!fe.files[0]){alert('Seleziona un file.');return;}
+  const file=fe.files[0];const nm=(file.name||'').toLowerCase();let aoa=[];
+  st.textContent='Lettura del file…';
+  try{
+    if(nm.endsWith('.csv')){const txt=await file.text();aoa=txt.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split(/[,;\t]/).map(c=>c.replace(/^"|"$/g,'').trim()));}
+    else{await loadXlsx();const buf=await file.arrayBuffer();const wb=window.XLSX.read(buf,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];aoa=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:''});}
+  }catch(e){st.textContent='Errore lettura file: '+(e.message||e);return;}
+  if(aoa.length<2){st.textContent='Il file sembra vuoto.';return;}
+  const hdr=aoa[0].map(c=>(''+c).toLowerCase().trim());
+  const ciName=impPick(hdr,'name','nome','ragione sociale','ragione','azienda','company');
+  const ciAddr=impPick(hdr,'address','indirizzo','via','street','street_name');
+  const ciNum=impPick(hdr,'street_number','civico','numero');
+  const ciZip=impPick(hdr,'zip','cap','npa','postal');
+  const ciCity=impPick(hdr,'city','città','citta','localita','località');
+  const ciCountry=impPick(hdr,'country','paese','country_id','nazione');
+  const ciPhone=impPick(hdr,'phone','telefono','tel');
+  const ciEmail=impPick(hdr,'email','e-mail','mail');
+  const ciVat=impPick(hdr,'vat','iva','p.iva','partita','vat_number','ide','uid');
+  if(ciName<0){st.textContent='Non trovo la colonna del nome azienda. Assicurati che ci sia una colonna "Nome" o "Ragione sociale".';return;}
+  const clean=v=>{if(v==null)return '';const s=(''+v).trim();return (s==='False'||s==='--'||s==='None')?'':s;};
+  const existing=(await store.list('companies')).map(c=>(c.name||'').toLowerCase().trim());
+  const seen=new Set();const out=[];
+  for(let i=1;i<aoa.length;i++){const r=aoa[i];const name=clean(r[ciName]);if(!name)continue;
+    const key=name.toLowerCase();
+    let addr=clean(r[ciAddr]);if(ciNum>=0&&clean(r[ciNum]))addr=(addr+' '+clean(r[ciNum])).trim();
+    const dup=existing.includes(key)||seen.has(key);seen.add(key);
+    out.push({name,address:addr,zip:clean(r[ciZip]).replace(/^CH-/i,''),city:clean(r[ciCity]),country:clean(r[ciCountry])||'Svizzera',phone:clean(r[ciPhone]),email:clean(r[ciEmail]),vat_number:clean(r[ciVat]),dup});}
+  IMP_CO=out;
+  const nuove=out.filter(x=>!x.dup).length;const skip=out.length-nuove;
+  st.innerHTML=`Trovate <b>${out.length}</b> righe: ${nuove} da importare, ${skip} già presenti (saltate). Deseleziona quelle che non vuoi.`;
+  document.getElementById('impPreview').innerHTML=`<table class="lines" style="margin-top:10px"><thead><tr><th style="width:30px"><input type="checkbox" checked onclick="document.querySelectorAll('.impchk').forEach(c=>c.checked=this.checked)"></th><th>Nome</th><th>Città</th><th>Paese</th><th>Stato</th></tr></thead><tbody>${out.map((x,i)=>`<tr style="${x.dup?'opacity:.5':''}"><td><input type="checkbox" class="impchk" data-i="${i}" ${x.dup?'':'checked'}></td><td><b>${esc(x.name)}</b></td><td>${esc(x.city||'—')}</td><td>${esc(x.country||'—')}</td><td>${x.dup?'<span class="pill r">già presente</span>':'<span class="pill g">nuova</span>'}</td></tr>`).join('')}</tbody></table>
+    <div style="margin-top:12px"><button class="btn" type="button" onclick="impDoImport()">Importa selezionate</button></div>`;
+}
+async function impDoImport(){
+  const checks=[...document.querySelectorAll('.impchk:checked')].map(c=>parseInt(c.dataset.i));
+  if(!checks.length){alert('Nessuna azienda selezionata.');return;}
+  const st=document.getElementById('impStatus');let ok=0;
+  for(const i of checks){const x=IMP_CO[i];
+    try{await store.insert('companies',{name:x.name,types:['Cliente'],address:x.address,zip:x.zip,city:x.city,country:x.country,phone:x.phone,email:x.email,vat_number:x.vat_number});ok++;st.textContent='Importazione… '+ok+'/'+checks.length;}
+    catch(e){}
+  }
+  toast(ok+' aziende importate');closeModal();render();
+}
 function toast(msg){const d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#16181f;color:#fff;padding:11px 18px;border-radius:10px;z-index:400;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.3)';document.body.appendChild(d);setTimeout(()=>d.remove(),2200);}
 
 function applyLogos(){document.querySelectorAll('.logo .mark').forEach(el=>{el.style.background='transparent';el.style.overflow='hidden';el.innerHTML='<img src="'+LOGO_ICON+'" alt="SecurData" style="width:100%;height:100%;object-fit:cover;border-radius:8px">';});}
