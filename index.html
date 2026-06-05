@@ -367,7 +367,7 @@ const MODULES=[
   {id:'sales_orders',label:'Ordini cliente'},
   {id:'purchase_orders',label:'Ordini a Fornitore'},{id:'licenses',label:'Licenze & Canoni'},
   {id:'products',label:'Prodotti & Magazzino'},{id:'quotes',label:'Preventivi'},
-  {id:'invoices',label:'Fatture'},{id:'proformas',label:'Proforma'},{id:'documents',label:'Documenti'},{id:'banks',label:'Banche'},{id:'settings',label:'Impostazioni'}
+  {id:'invoices',label:'Fatture'},{id:'proformas',label:'Proforma'},{id:'expenses',label:'Acquisti / Spese'},{id:'documents',label:'Documenti'},{id:'banks',label:'Banche'},{id:'settings',label:'Impostazioni'}
 ];
 
 /* ===== store interface ===== */
@@ -453,7 +453,7 @@ function DemoStore(){
       ]
     };
   }
-  const cols=['settings','app_users','companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','documents','banks','access_logs','campaigns'];
+  const cols=['settings','app_users','companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','expenses','documents','banks','access_logs','campaigns'];
   const norm=t=>cols.includes(t)?t:null;
   return {
     mode:'demo',
@@ -533,6 +533,7 @@ const PAGES=[
   {grp:'Documenti'},
   {id:'quotes',icon:'🧾',label:'Preventivi'},
   {id:'invoices',icon:'💶',label:'Fatture'},
+  {id:'expenses',icon:'📒',label:'Acquisti / Spese'},
   {id:'proformas',icon:'🧾',label:'Proforma'},
   {id:'documents',icon:'📎',label:'Documenti'},
   {grp:'Sistema'},
@@ -550,13 +551,13 @@ function buildNav(){let h='';let pending=null;
 function go(id){if(!can(id)){id='dashboard'}PAGE=id;buildNav();render();}
 
 /* ===== router ===== */
-const TITLES={dashboard:'Dashboard',leads:'Lead & Opportunità',pipeline:'Pipeline commerciale',companies:'Aziende',contacts:'Contatti',marketing:'Marketing',sales_orders:'Ordini cliente',purchase_orders:'Ordini a Fornitore',licenses:'Licenze & Canoni',products:'Prodotti & Magazzino',quotes:'Preventivi',invoices:'Fatture',proformas:'Proforma',documents:'Documenti',banks:'Banche',settings:'Impostazioni',access_logs:'Log accessi'};
+const TITLES={dashboard:'Dashboard',leads:'Lead & Opportunità',pipeline:'Pipeline commerciale',companies:'Aziende',contacts:'Contatti',marketing:'Marketing',sales_orders:'Ordini cliente',purchase_orders:'Ordini a Fornitore',licenses:'Licenze & Canoni',products:'Prodotti & Magazzino',quotes:'Preventivi',invoices:'Fatture',expenses:'Acquisti / Spese',proformas:'Proforma',documents:'Documenti',banks:'Banche',settings:'Impostazioni',access_logs:'Log accessi'};
 async function render(){
   if(!can(PAGE))PAGE='dashboard';
   document.getElementById('pageTitle').textContent=TITLES[PAGE]||'';
   const add=document.getElementById('primaryAdd');
-  const addMap={leads:editLead,companies:editCompany,contacts:editContact,marketing:editCampaign,licenses:editLicense,products:editProduct,quotes:editQuote,invoices:editInvoice,sales_orders:editSalesOrder,purchase_orders:editPurchaseOrder,proformas:editProforma,documents:editDocument,banks:editBank};
-  const lbl={leads:'+ Nuovo lead',companies:'+ Nuova azienda',contacts:'+ Nuovo contatto',marketing:'+ Nuova campagna',partners:'+ Nuovo partner',licenses:'+ Nuova licenza',products:'+ Nuovo prodotto',quotes:'+ Nuovo preventivo',invoices:'+ Nuova fattura',sales_orders:'+ Nuovo ordine',purchase_orders:'+ Nuovo ordine',proformas:'+ Nuova proforma',documents:'+ Carica documento',banks:'+ Nuovo conto'};
+  const addMap={leads:editLead,companies:editCompany,contacts:editContact,marketing:editCampaign,licenses:editLicense,products:editProduct,quotes:editQuote,invoices:editInvoice,sales_orders:editSalesOrder,purchase_orders:editPurchaseOrder,proformas:editProforma,expenses:editExpense,documents:editDocument,banks:editBank};
+  const lbl={leads:'+ Nuovo lead',companies:'+ Nuova azienda',contacts:'+ Nuovo contatto',marketing:'+ Nuova campagna',partners:'+ Nuovo partner',licenses:'+ Nuova licenza',products:'+ Nuovo prodotto',quotes:'+ Nuovo preventivo',invoices:'+ Nuova fattura',sales_orders:'+ Nuovo ordine',purchase_orders:'+ Nuovo ordine',proformas:'+ Nuova proforma',expenses:'+ Nuova spesa',documents:'+ Carica documento',banks:'+ Nuovo conto'};
   if(addMap[PAGE]&&PAGE!=='contacts'&&PAGE!=='companies'&&PAGE!=='documents'){add.style.display='';add.onclick=()=>addMap[PAGE]();add.textContent=lbl[PAGE];}else add.style.display='none';
   const c=document.getElementById('content');c.innerHTML='<div class="empty">Caricamento…</div>';
   try{ await VIEWS[PAGE](c); }catch(e){ c.innerHTML='<div class="callout">Errore: '+esc(e.message||e)+'</div>'; console.error(e);}
@@ -778,7 +779,7 @@ VIEWS.proformas=async(c)=>{const [rows,companies]=await Promise.all([store.list(
 
 /* ===== INVOICES ===== */
 VIEWS.invoices=async(c)=>{const [inv,companies]=await Promise.all([store.list('invoices'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca fattura…','sI')}<span style="color:var(--muted);font-size:12.5px">${inv.length} fatture</span></div>
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca fattura…','sI')}<span style="color:var(--muted);font-size:12.5px">${inv.length} fatture</span><div class="spacer"></div><button class="btn ghost" onclick="openRegister('invoices')">📊 Registro</button></div>
   <div class="card"><table><thead><tr><th>Numero</th><th>Cliente</th><th>P.IVA cliente</th><th>Data</th><th class="num">Totale</th><th>Stato</th><th></th></tr></thead><tbody>${
   inv.map(q=>{const t=docTotals(q);const cm=comp[q.company]||{};const stc=q.status==='Pagata'?'g':q.status==='Annullata'?'r':q.status==='Inviata'?'b':q.status==='Scaduta'?'r':'n';
     return `<tr data-s="${esc((q.number+' '+cm.name+' '+(cm.vat_number||'')).toLowerCase())}" onclick="editInvoice('${q.id}')"><td class="mono"><b>${esc(q.number)}</b></td><td>${esc(cm.name||'—')}</td><td class="mono" style="font-size:12px">${esc(cm.vat_number||'—')}</td><td>${dateIt(q.date)}</td><td class="num">${money(t.total)}</td><td><span class="pill ${stc}">${esc(q.status)}</span></td><td class="rowact">
@@ -1606,6 +1607,113 @@ function toggleDocDisc(){if(!PRINT_CTX)return;PRINT_CTX.showDisc=!PRINT_CTX.show
 function closePrint(){document.getElementById('printroot').style.display='none';document.getElementById('printroot').innerHTML='';document.getElementById('app').style.display='block';}
 function printNow(){const t=document.title;document.title='';const restore=()=>{document.title=t;window.removeEventListener('afterprint',restore);};window.addEventListener('afterprint',restore);setTimeout(restore,3000);window.print();}
 
+/* ===== ACQUISTI / SPESE (fatture fornitori) ===== */
+const EXP_STATUS=['Da pagare','Pagata'];
+const EXP_CATS=['Hardware','Software','Licenze','Servizi','Consulenze','Affitto','Utenze','Telefonia','Marketing','Trasporti','Cancelleria','Altro'];
+let EXP_PENDING_FILE=null;
+function moneyc(n,cur){n=Number(n||0);return n.toLocaleString('it-CH',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(cur||CUR);}
+
+VIEWS.expenses=async(c)=>{const [rows,companies]=await Promise.all([store.list('expenses'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca spesa…','sEXP')}<span style="color:var(--muted);font-size:12.5px">${rows.length} spese</span><div class="spacer"></div><button class="btn ghost" onclick="importExpensePdf()">📥 Importa PDF</button><button class="btn ghost" onclick="openRegister('expenses')">📊 Registro</button><button class="btn red" onclick="editExpense()">+ Nuova spesa</button></div>
+  <div class="card"><table><thead><tr><th>Data</th><th>N° fattura</th><th>Fornitore</th><th class="num">Imponibile</th><th class="num">IVA</th><th class="num">Totale</th><th>Stato</th><th></th></tr></thead><tbody>${
+  rows.map(r=>{const cm=comp[r.supplier]||{};const stc=r.status==='Pagata'?'g':'a';
+    return `<tr data-s="${esc(((r.number||'')+' '+(cm.name||'')).toLowerCase())}" onclick="editExpense('${r.id}')"><td>${dateIt(r.date)}</td><td class="mono">${esc(r.number||'—')}</td><td>${esc(cm.name||'—')}</td><td class="num mono">${moneyc(r.net,r.currency)}</td><td class="num mono">${moneyc(r.vat_amount,r.currency)}</td><td class="num mono">${moneyc(r.total,r.currency)}</td><td><span class="pill ${stc}">${esc(r.status||'Da pagare')}</span></td><td class="rowact">${(r.pdf_path||r.pdf_data)?`<button class="iconbtn" title="Apri PDF" onclick="event.stopPropagation();viewExpensePdf('${r.id}')">📄</button>`:''}<button class="iconbtn" onclick="event.stopPropagation();delRow('expenses','${r.id}')">🗑</button></td></tr>`;
+  }).join('')||'<tr><td colspan="8" class="empty">Nessuna spesa registrata.</td></tr>'}</tbody></table></div>`;};
+
+async function editExpense(id,prefill){EXP_PENDING_FILE=(prefill&&prefill._file)||null;
+  const companies=await store.list('companies');
+  const r=id?(await store.get('expenses',id)||{}):(prefill||{});
+  const sup=companies.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(co=>`<option value="${co.id}" ${r.supplier===co.id?'selected':''}>${esc(co.name)}</option>`).join('');
+  const body=`<div class="fgrid">
+    <div class="field"><label>Fornitore</label><select id="ex_sup"><option value="">—</option>${sup}</select></div>
+    <div class="field"><label>N° fattura fornitore</label><input id="ex_num" value="${esc(r.number||'')}"></div>
+    <div class="field"><label>Data</label><input id="ex_date" type="date" value="${esc(r.date||new Date().toISOString().slice(0,10))}"></div>
+    <div class="field"><label>Scadenza</label><input id="ex_due" type="date" value="${esc(r.due_date||'')}"></div>
+    <div class="field"><label>Valuta</label><select id="ex_cur">${ENUM.currencies.map(o=>`<option ${o===(r.currency||CUR)?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div class="field"><label>Categoria</label><input id="ex_cat" list="dlExpCats" value="${esc(r.category||'')}"></div>
+    <div class="field"><label>Imponibile</label><input id="ex_net" type="number" step="any" value="${r.net||0}" oninput="exRecalc()"></div>
+    <div class="field"><label>IVA (importo)</label><input id="ex_vat" type="number" step="any" value="${r.vat_amount||0}" oninput="exRecalc()"></div>
+    <div class="field"><label>Totale</label><input id="ex_total" type="number" step="any" value="${r.total||0}"></div>
+    <div class="field"><label>Stato</label><select id="ex_status">${EXP_STATUS.map(o=>`<option ${o===(r.status||'Da pagare')?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div class="field full"><label>Note</label><textarea id="ex_notes" rows="2">${esc(r.notes||'')}</textarea></div>
+    <div class="field full"><label>PDF fattura ricevuta</label><input id="ex_pdf" type="file" accept="application/pdf" onchange="EXP_PENDING_FILE=this.files[0]||EXP_PENDING_FILE;var n=document.getElementById('ex_pdfname');if(n&&EXP_PENDING_FILE)n.textContent=EXP_PENDING_FILE.name"> <span id="ex_pdfname" style="font-size:12px;color:var(--muted)">${EXP_PENDING_FILE?esc(EXP_PENDING_FILE.name):(r.pdf_name?('Allegato: '+esc(r.pdf_name)):'')}</span></div>
+  </div><datalist id="dlExpCats">${EXP_CATS.map(x=>`<option value="${x}">`).join('')}</datalist>`;
+  openModal(id?'Modifica spesa':'Nuova spesa',body,()=>saveExpense(id),{wide:true,saveLabel:'Salva'});
+}
+function exRecalc(){const net=parseFloat(val('ex_net'))||0;const vat=parseFloat(val('ex_vat'))||0;const t=document.getElementById('ex_total');if(t)t.value=(net+vat).toFixed(2);}
+async function saveExpense(id){
+  const o={supplier:val('ex_sup'),number:val('ex_num'),date:val('ex_date'),due_date:val('ex_due'),currency:val('ex_cur'),category:val('ex_cat'),net:parseFloat(val('ex_net'))||0,vat_amount:parseFloat(val('ex_vat'))||0,total:parseFloat(val('ex_total'))||0,status:val('ex_status'),notes:val('ex_notes')};
+  if(EXP_PENDING_FILE){const up=await uploadExpensePdf(EXP_PENDING_FILE);Object.assign(o,up);}
+  if(id)await store.update('expenses',id,o); else await store.insert('expenses',o);
+  EXP_PENDING_FILE=null;toast('Spesa salvata');
+}
+async function uploadExpensePdf(file){
+  if(MODE==='supabase'&&SB){const path='expenses/'+Date.now()+'_'+file.name.replace(/[^A-Za-z0-9._-]/g,'_');
+    const {error}=await SB.storage.from('fatture').upload(path,file,{upsert:true,contentType:'application/pdf'});
+    if(error)throw new Error('upload PDF: '+error.message);
+    return {pdf_path:path,pdf_name:file.name};}
+  if(file.size>3*1024*1024)throw new Error('In modalità demo il PDF deve essere < 3MB');
+  const data=await new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res(rd.result);rd.onerror=rej;rd.readAsDataURL(file);});
+  return {pdf_data:data,pdf_name:file.name};
+}
+async function viewExpensePdf(id){const r=await store.get('expenses',id);if(!r)return;
+  if(r.pdf_data){window.open(r.pdf_data,'_blank');return;}
+  if(r.pdf_path&&SB){const {data,error}=await SB.storage.from('fatture').createSignedUrl(r.pdf_path,120);if(error){alert('Errore apertura PDF: '+error.message);return;}window.open(data.signedUrl,'_blank');return;}
+  alert('Nessun PDF allegato.');
+}
+function importExpensePdf(){const inp=document.createElement('input');inp.type='file';inp.accept='application/pdf';
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;toast('Lettura PDF…');
+    try{const text=await pdfExtractText(f);const companies=await store.list('companies');const pre=parseExpensePdf(text,companies);pre._file=f;editExpense(null,pre);toast('Dati pre-compilati: controlla e salva');}
+    catch(e){alert('Impossibile leggere il PDF (forse è scansionato come immagine): '+(e.message||e));}};
+  inp.click();
+}
+function parseExpensePdf(text,companies){const out={};
+  const dm=text.match(/\b(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})\b/);
+  if(dm){let y=dm[3];if(y.length===2)y='20'+y;out.date=y+'-'+dm[2].padStart(2,'0')+'-'+dm[1].padStart(2,'0');}
+  const nm=text.match(/(?:fattura|rechnung|invoice|facture|n[°ro.]+)\s*[:#]?\s*([A-Za-z0-9\/\-]{2,})/i);
+  if(nm)out.number=nm[1];
+  out.currency=/€|EUR/.test(text)?'EUR':'CHF';
+  let total=0;const tm=[...text.matchAll(/(?:totale|total|gesamtbetrag|montant)\s*(?:CHF|EUR|€)?\s*([0-9][0-9.'\u00a0 ]*[.,][0-9]{2})/gi)];
+  if(tm.length)total=Math.max(...tm.map(m=>parseNum(m[1])));
+  if(!total){const all=[...text.matchAll(/([0-9][0-9.'\u00a0 ]*[.,][0-9]{2})/g)].map(m=>parseNum(m[1]));if(all.length)total=Math.max(...all);}
+  out.total=total;
+  let vat=0;const vm=[...text.matchAll(/(?:IVA|TVA|MwSt|VAT)[^0-9]{0,12}([0-9][0-9.'\u00a0 ]*[.,][0-9]{2})/gi)];
+  if(vm.length)vat=parseNum(vm[0][1]);
+  out.vat_amount=vat;out.net=(total&&vat)?Math.round((total-vat)*100)/100:0;
+  const low=text.toLowerCase();const hit=companies.find(co=>co.name&&co.name.length>3&&low.includes(co.name.toLowerCase()));
+  if(hit)out.supplier=hit.id;
+  out.status='Da pagare';
+  return out;
+}
+
+/* ===== REGISTRO CONTABILITA' (export per periodo) ===== */
+function openRegister(kind){const y=new Date().getFullYear();
+  const body=`<div class="fgrid"><div class="field"><label>Dal</label><input id="rg_from" type="date" value="${y}-01-01"></div><div class="field"><label>Al</label><input id="rg_to" type="date" value="${y}-12-31"></div></div><p style="font-size:12.5px;color:var(--muted);margin:6px 0 0">Genera il registro ${kind==='expenses'?'delle spese (fatture fornitori)':'delle fatture emesse'} nel periodo selezionato, pronto da stampare o salvare in PDF per la contabilità.</p>`;
+  openModal('Registro contabilità',body,()=>renderRegister(kind,val('rg_from'),val('rg_to')),{saveLabel:'Genera registro'});
+}
+async function renderRegister(kind,from,to){
+  const companies=await store.list('companies');const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
+  let rows,title,partyLbl,partyKey;
+  if(kind==='expenses'){rows=await store.list('expenses');title='REGISTRO ACQUISTI / SPESE';partyLbl='Fornitore';partyKey='supplier';}
+  else{rows=await store.list('invoices');title='REGISTRO FATTURE EMESSE';partyLbl='Cliente';partyKey='company';}
+  rows=rows.filter(r=>{const d=r.date||'';return (!from||d>=from)&&(!to||d<=to);}).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  let net=0,vat=0,tot=0;
+  const trs=rows.map(r=>{let rn,rv,rt;if(kind==='expenses'){rn=Number(r.net)||0;rv=Number(r.vat_amount)||0;rt=Number(r.total)||0;}else{const t=docTotals(r);rn=t.net;rv=t.tax;rt=t.total;}net+=rn;vat+=rv;tot+=rt;const cur=r.currency||'CHF';
+    return `<tr><td>${dateIt(r.date)}</td><td class="mono">${esc(r.number||'—')}</td><td>${esc((comp[r[partyKey]]||{}).name||'—')}</td><td class="amt mono">${moneyc(rn,cur)}</td><td class="amt mono">${moneyc(rv,cur)}</td><td class="amt mono">${moneyc(rt,cur)}</td></tr>`;}).join('');
+  const st=await store.settings();
+  const html=`<div class="printbar"><b>Registro contabilità</b><div class="spacer"></div><button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div>
+   <div id="docpages"><div class="page"><div class="doc" style="padding:42px 46px;max-width:none">
+     <h2 style="font-family:var(--disp);margin:0 0 2px;font-size:18px">${title}</h2>
+     <div style="color:#555;font-size:12px;margin-bottom:14px">${esc(st.name||'')} · Periodo ${dateIt(from)} – ${dateIt(to)} · ${rows.length} documenti</div>
+     <table class="it" style="width:100%"><thead><tr><th>Data</th><th>N°</th><th>${partyLbl}</th><th class="amt">Imponibile</th><th class="amt">IVA</th><th class="amt">Totale</th></tr></thead>
+     <tbody>${trs||'<tr><td colspan="6" style="text-align:center;padding:18px;color:#888">Nessun documento nel periodo selezionato</td></tr>'}</tbody>
+     <tfoot><tr style="font-weight:700"><td colspan="3" style="border-top:2px solid #333;padding-top:8px">TOTALI</td><td class="amt mono" style="border-top:2px solid #333;padding-top:8px">${moneyc(net,'CHF')}</td><td class="amt mono" style="border-top:2px solid #333;padding-top:8px">${moneyc(vat,'CHF')}</td><td class="amt mono" style="border-top:2px solid #333;padding-top:8px">${moneyc(tot,'CHF')}</td></tr></tfoot>
+     </table>
+     <div style="margin-top:12px;font-size:10.5px;color:#999">Totali in CHF. Le righe in valuta estera sono mostrate nella valuta del documento; verificare la conversione per la contabilizzazione.</div>
+   </div></div></div>`;
+  document.getElementById('printroot').innerHTML=html;document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';
+}
+
 /* ===== QR-FATTURA SVIZZERA (Swiss QR-bill) ===== */
 const CC={'Svizzera':'CH','Italia':'IT','Germania':'DE','Francia':'FR','Austria':'AT','Liechtenstein':'LI','Spagna':'ES','Portogallo':'PT','Paesi Bassi':'NL','Belgio':'BE','Lussemburgo':'LU','Regno Unito':'GB','Irlanda':'IE','Stati Uniti':'US','Canada':'CA'};
 function cc(name){return CC[name]||'CH';}
@@ -1783,7 +1891,7 @@ async function boot(){const s=await store.settings();CUR=(s&&s.currency)||'CHF';
 function twofaReminder(){document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onmousedown="this._mdbg=event.target===this" onclick="if(this._mdbg&&event.target===this)closeModal()"><div class="modal" style="max-width:470px"><div class="mhd"><h3>🔒 Proteggi il tuo account</h3><button onclick="closeModal()">×</button></div><div class="mbd"><p style="margin:0 0 10px">Per maggiore sicurezza ti consigliamo di attivare la <b>verifica in due passaggi (2FA)</b>.</p><div class="callout">Finché non la attivi, questo avviso comparirà a ogni accesso. Bastano pochi secondi con un'app come Google Authenticator o Microsoft Authenticator.</div></div><div class="mft"><button class="btn ghost" onclick="closeModal()">Più tardi</button><button class="btn red" onclick="closeModal();security2FA()">Attiva ora</button></div></div></div>`;}
 async function logout(){try{if(MODE==='supabase'&&SB)await SB.auth.signOut();}catch(e){}LS.del('securgest_mode');LS.del('securgest_user');location.reload();}
 async function resetDemo(){if(!confirm('Ripristinare i dati demo iniziali?'))return;await store.reset();render();toast('Dati demo ripristinati');}
-async function exportData(){const tables=['companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','documents','banks','app_users'];const out={settings:await store.settings()};for(const t of tables)out[t]=await store.list(t);const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='securgest-export.json';a.click();}
+async function exportData(){const tables=['companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','expenses','documents','banks','app_users'];const out={settings:await store.settings()};for(const t of tables)out[t]=await store.list(t);const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='securgest-export.json';a.click();}
 
 /* ===== IMPORT AZIENDE da Excel/CSV ===== */
 let IMP_CO=[];
