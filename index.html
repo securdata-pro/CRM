@@ -1599,14 +1599,15 @@ function docPagesHtml(ctx){const {s,doc,t,showDisc}=ctx;
     return `<div class="page"><div class="doc" style="padding:0;max-width:none">${body}</div><div class="pfoot"><span>${footLine}</span><span class="pno">${N>1?(idx+1)+' / '+N:''}</span></div></div>`;
   }).join('');}
 let PRINT_CTX=null;
-async function printDoc(kind,id){const ctx=await getDocCtx(kind,id);PRINT_CTX=ctx;
+async function printDoc(kind,id){const ctx=await getDocCtx(kind,id);PRINT_CTX=ctx;PRINT_TITLE=((ctx.cfg.title||'Documento')+' - '+(ctx.doc.number||'')).replace(/[/:*?"<>|]/g,'-');
   document.getElementById('printroot').innerHTML=`
    <div class="printbar"><b>Anteprima ${ctx.cfg.label}</b><div class="spacer"></div><button id="discToggleBtn" class="btn ghost sm" style="color:#fff;border-color:#444" onclick="toggleDocDisc()">${ctx.showDisc?'Nascondi sconto':'Mostra sconto'}</button><button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div>
    <div id="docpages">${docPagesHtml(ctx)}</div>`;
   document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';closeModal();}
 function toggleDocDisc(){if(!PRINT_CTX)return;PRINT_CTX.showDisc=!PRINT_CTX.showDisc;const d=document.getElementById('docpages');if(d)d.innerHTML=docPagesHtml(PRINT_CTX);const b=document.getElementById('discToggleBtn');if(b)b.textContent=PRINT_CTX.showDisc?'Nascondi sconto':'Mostra sconto';}
 function closePrint(){document.getElementById('printroot').style.display='none';document.getElementById('printroot').innerHTML='';document.getElementById('app').style.display='block';}
-function printNow(){const t=document.title;document.title='';const restore=()=>{document.title=t;window.removeEventListener('afterprint',restore);};window.addEventListener('afterprint',restore);setTimeout(restore,3000);window.print();}
+let PRINT_TITLE='';
+function printNow(){const t=document.title;document.title=PRINT_TITLE||'';const restore=()=>{document.title=t;PRINT_TITLE='';window.removeEventListener('afterprint',restore);};window.addEventListener('afterprint',restore);setTimeout(restore,3000);window.print();}
 
 /* ===== ACQUISTI / SPESE (fatture fornitori) ===== */
 const EXP_STATUS=['Da pagare','Pagata'];
@@ -1615,12 +1616,28 @@ let EXP_PENDING_FILE=null;
 function moneyc(n,cur){n=Number(n||0);return n.toLocaleString('it-CH',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(cur||CUR);}
 
 let EX_LINES=[];
+const EXP_COLS=[
+ {id:'supplier',label:'Fornitore',cell:(r,comp)=>esc((comp[r.supplier]||{}).name||'—')},
+ {id:'descrizione',label:'Descrizione',cell:(r)=>{const d=(r.lines&&r.lines.length?r.lines.map(l=>l.desc).filter(Boolean).join(' · '):'')||'—';return `<span style="font-size:12px;color:#555;display:inline-block;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${esc(d)}</span>`;}},
+ {id:'category',label:'Categoria',cell:(r)=>esc(r.category||'—')},
+ {id:'due_date',label:'Scadenza',cell:(r)=>dateIt(r.due_date)},
+ {id:'net',label:'Imponibile',num:true,cell:(r)=>`<span class="mono">${moneyc(r.net,r.currency)}</span>`},
+ {id:'vat',label:'IVA',num:true,cell:(r)=>`<span class="mono">${moneyc(r.vat_amount,r.currency)}</span>`},
+ {id:'total',label:'Totale',num:true,cell:(r)=>`<span class="mono">${moneyc(r.total,r.currency)}</span>`},
+ {id:'status',label:'Stato',cell:(r)=>{const stc=r.status==='Pagata'?'g':'a';return `<span class="pill ${stc}">${esc(r.status||'Da pagare')}</span> <button class="iconbtn" title="Cambia stato (pagata / da pagare)" onclick="event.stopPropagation();toggleExpenseStatus('${r.id}')">⇄</button>`;}}
+];
+function expColsKey(){return 'securgest_expcols_'+((CURRENT_USER&&CURRENT_USER.email)||'')}
+function getExpCols(){try{const v=JSON.parse(LS.get(expColsKey())||'null');if(Array.isArray(v)&&v.length)return v;}catch(e){}return ['supplier','descrizione','net','vat','total','status'];}
+function expColsCustomize(){const sel=getExpCols();openModal('Colonne elenco spese',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Scegli quali colonne mostrare nell'elenco (Data e N° fattura sono sempre presenti).</div><div class="checks" style="grid-template-columns:repeat(3,1fr)">${EXP_COLS.map(co=>`<label class="${sel.includes(co.id)?'on':''}"><input type="checkbox" class="excol" value="${co.id}" ${sel.includes(co.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(co.label)}</label>`).join('')}</div>`,async()=>{const ids=[...document.querySelectorAll('.excol:checked')].map(x=>x.value);LS.set(expColsKey(),JSON.stringify(ids));},{saveLabel:'Applica'});}
+async function toggleExpenseStatus(id){const r=await store.get('expenses',id);if(!r)return;const ns=(r.status==='Pagata')?'Da pagare':'Pagata';await store.update('expenses',id,{status:ns});render();}
+
 VIEWS.expenses=async(c)=>{const [rows,companies]=await Promise.all([store.list('expenses'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca spesa…','sEXP')}<span style="color:var(--muted);font-size:12.5px">${rows.length} spese</span><div class="spacer"></div><button class="btn ghost" onclick="importExpensePdf()">📥 Importa PDF</button><button class="btn ghost" onclick="exportAllExpenses()">🖨 Esporta tutte (PDF)</button><button class="btn ghost" onclick="openRegister('expenses')">📊 Registro</button><button class="btn red" onclick="editExpense()">+ Nuova spesa</button></div>
-  <div class="card"><table><thead><tr><th>Data</th><th>N° fattura</th><th>Fornitore</th><th>Descrizione</th><th class="num">Imponibile</th><th class="num">IVA</th><th class="num">Totale</th><th>Stato</th><th></th></tr></thead><tbody>${
-  rows.map(r=>{const cm=comp[r.supplier]||{};const stc=r.status==='Pagata'?'g':'a';const desc=(r.lines&&r.lines.length?r.lines.map(l=>l.desc).filter(Boolean).join(' · '):'')||'';
-    return `<tr data-s="${esc(((r.number||'')+' '+(cm.name||'')+' '+desc).toLowerCase())}" onclick="editExpense('${r.id}')"><td>${dateIt(r.date)}</td><td class="mono">${esc(r.number||'—')}</td><td>${esc(cm.name||'—')}</td><td style="font-size:12px;color:#555;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc||'—')}</td><td class="num mono">${moneyc(r.net,r.currency)}</td><td class="num mono">${moneyc(r.vat_amount,r.currency)}</td><td class="num mono">${moneyc(r.total,r.currency)}</td><td><span class="pill ${stc}">${esc(r.status||'Da pagare')}</span></td><td class="rowact">${(r.pdf_path||r.pdf_data)?`<button class="iconbtn" title="Apri PDF originale" onclick="event.stopPropagation();viewExpensePdf('${r.id}')">📄</button>`:''}<button class="iconbtn" title="Stampa fattura" onclick="event.stopPropagation();printExpense('${r.id}')">🖨</button><button class="iconbtn" onclick="event.stopPropagation();delRow('expenses','${r.id}')">🗑</button></td></tr>`;
-  }).join('')||'<tr><td colspan="9" class="empty">Nessuna spesa registrata.</td></tr>'}</tbody></table></div>`;};
+  const selIds=getExpCols();const cols=EXP_COLS.filter(x=>selIds.includes(x.id));
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca spesa…','sEXP')}<span style="color:var(--muted);font-size:12.5px">${rows.length} spese</span><div class="spacer"></div><button class="btn ghost sm" onclick="expColsCustomize()">⚙ Colonne</button><button class="btn ghost" onclick="importExpensePdf()">📥 Importa PDF</button><button class="btn ghost" onclick="exportAllExpenses()">🖨 Esporta tutte (PDF)</button><button class="btn ghost" onclick="openRegister('expenses')">📊 Registro</button><button class="btn red" onclick="editExpense()">+ Nuova spesa</button></div>
+  <div class="card"><table><thead><tr><th>Data</th><th>N° fattura</th>${cols.map(co=>`<th class="${co.num?'num':''}">${esc(co.label)}</th>`).join('')}<th></th></tr></thead><tbody>${
+  rows.map(r=>{const cm=comp[r.supplier]||{};const desc=(r.lines&&r.lines.length?r.lines.map(l=>l.desc).filter(Boolean).join(' '):'');
+    return `<tr data-s="${esc(((r.number||'')+' '+(cm.name||'')+' '+desc).toLowerCase())}" onclick="editExpense('${r.id}')"><td>${dateIt(r.date)}</td><td class="mono">${esc(r.number||'—')}</td>${cols.map(co=>`<td class="${co.num?'num':''}">${co.cell(r,comp)}</td>`).join('')}<td class="rowact">${(r.pdf_path||r.pdf_data)?`<button class="iconbtn" title="Apri PDF originale" onclick="event.stopPropagation();viewExpensePdf('${r.id}')">📄</button>`:''}<button class="iconbtn" title="Stampa fattura" onclick="event.stopPropagation();printExpense('${r.id}')">🖨</button><button class="iconbtn" onclick="event.stopPropagation();delRow('expenses','${r.id}')">🗑</button></td></tr>`;
+  }).join('')||`<tr><td colspan="${cols.length+3}" class="empty">Nessuna spesa registrata.</td></tr>`}</tbody></table></div>`;};
 
 function exTotals(){let net=0,tax=0;EX_LINES.forEach(l=>{const a=(Number(l.qty)||0)*(Number(l.price)||0)*(1-((Number(l.disc)||0)/100));net+=a;tax+=a*(Number(l.vat)||0)/100;});return{net,tax,total:net+tax};}
 function exUpdTot(){const t=exTotals();const cur=val('ex_cur')||'CHF';const el=document.getElementById('exTotSummary');if(el)el.innerHTML=`Imponibile <b>${moneyc(t.net,cur)}</b> &nbsp;·&nbsp; IVA <b>${moneyc(t.tax,cur)}</b> &nbsp;·&nbsp; Totale <b>${moneyc(t.total,cur)}</b>`;}
@@ -1680,11 +1697,12 @@ function expensePageHtml(r,sup,s,bank){const cur=r.currency||'CHF';const lines=(
    <div class="dtot"><div class="r"><span>Importo</span><span class="mono">${moneyc(r.net,cur)}</span></div><div class="r"><span>Imposte</span><span class="mono">${moneyc(r.vat_amount,cur)}</span></div><div class="r big"><span>Totale</span><span class="mono">${moneyc(r.total,cur)}</span></div></div>
    ${bankH}
   </div><div class="pfoot" style="justify-content:center"><span>${docFootLine(s)}</span></div></div>`;}
-async function printExpense(id){const r=await store.get('expenses',id);if(!r)return;const companies=await store.list('companies');const sup=companies.find(c=>c.id===r.supplier)||{};const s=await store.settings();const banks=await store.list('banks');const bank=banks.find(b=>b.is_default)||banks[0]||null;
+async function printExpense(id){const r=await store.get('expenses',id);if(!r)return;const companies=await store.list('companies');const sup=companies.find(c=>c.id===r.supplier)||{};const s=await store.settings();const banks=await store.list('banks');const bank=banks.find(b=>b.is_default)||banks[0]||null;PRINT_TITLE=('FATTURA FORNITORE - '+(r.number||'')).replace(/[/:*?"<>|]/g,'-');
   document.getElementById('printroot').innerHTML=`<div class="printbar"><b>Fattura fornitore ${esc(r.number||'')}</b><div class="spacer"></div>${(r.pdf_path||r.pdf_data)?`<button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="viewExpensePdf('${r.id}')">📄 PDF originale</button>`:''}<button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div><div id="docpages">${expensePageHtml(r,sup,s,bank)}</div>`;
   document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';closeModal();}
 async function exportAllExpenses(){const rows=(await store.list('expenses')).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));const companies=await store.list('companies');const comp=Object.fromEntries(companies.map(x=>[x.id,x]));const s=await store.settings();const banks=await store.list('banks');const bank=banks.find(b=>b.is_default)||banks[0]||null;
   if(!rows.length){alert('Nessuna spesa da esportare.');return;}
+  PRINT_TITLE='Fatture fornitori';
   const pages=rows.map(r=>expensePageHtml(r,comp[r.supplier]||{},s,bank)).join('');
   document.getElementById('printroot').innerHTML=`<div class="printbar"><b>Tutte le fatture fornitori (${rows.length})</b><div class="spacer"></div><button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div><div id="docpages">${pages}</div>`;
   document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';}
@@ -1738,6 +1756,7 @@ async function renderRegister(kind,from,to){
   let rows,title,partyLbl,partyKey;
   if(kind==='expenses'){rows=await store.list('expenses');title='REGISTRO ACQUISTI / SPESE';partyLbl='Fornitore';partyKey='supplier';}
   else{rows=await store.list('invoices');title='REGISTRO FATTURE EMESSE';partyLbl='Cliente';partyKey='company';}
+  PRINT_TITLE=(kind==='expenses'?'Registro acquisti':'Registro fatture emesse');
   rows=rows.filter(r=>{const d=r.date||'';return (!from||d>=from)&&(!to||d<=to);}).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   let net=0,vat=0,tot=0;
   const trs=rows.map(r=>{let rn,rv,rt;if(kind==='expenses'){rn=Number(r.net)||0;rv=Number(r.vat_amount)||0;rt=Number(r.total)||0;}else{const t=docTotals(r);rn=t.net;rv=t.tax;rt=t.total;}net+=rn;vat+=rv;tot+=rt;const cur=r.currency||'CHF';
