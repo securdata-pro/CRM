@@ -337,7 +337,7 @@ set(k,v){try{localStorage.setItem(k,v)}catch(e){Mem[k]=v}},del(k){try{localStora
 
 /* ===== enums ===== */
 const ENUM={
-  sources:['Sito web','Da partner','Telefono'],
+  sources:['Sito web','Social','Da partner','Contatto comune','Telefono','Email','Fiera / evento','Campagna marketing','Segnalazione','Altro'],
   pains:['Virtualizzazione','Migrazione cloud','Backup e disaster recovery','Compliance GDPR','Cybersecurity','Business continuity','Artificial Intelligence','ERP','CRM','Networking'],
   budget:['< 10.000 €','10.000 – 50.000 €','50.000 – 250.000 €','250.000 – 1 M€','> 1 M€'],
   timing:['Immediato (0–3 mesi)','Breve termine (3–6 mesi)','Medio termine (6–12 mesi)','Lungo termine (>12 mesi)'],
@@ -351,7 +351,7 @@ const ENUM={
   countries:['Svizzera','Italia','Germania','Francia','Austria','Liechtenstein','Spagna','Portogallo','Paesi Bassi','Belgio','Lussemburgo','Regno Unito','Irlanda','Danimarca','Svezia','Norvegia','Finlandia','Polonia','Repubblica Ceca','Slovacchia','Slovenia','Croazia','Ungheria','Romania','Bulgaria','Grecia','Stati Uniti','Canada','Emirati Arabi Uniti','Altro'],
   currencies:['CHF','EUR','USD'],
   partnerTypes:['Vendor / Produttore','Distributore','Rivenditore','System Integrator','Segnalatore','Altro'],
-  companyTypes:['Cliente','Partner','Lead','Fornitore'],
+  companyTypes:['Cliente','Partner','Fornitore'],
   licStatus:['POC / Demo in corso','Attiva','In rinnovo','Scaduta','Persa'],
   docStatus:['Bozza','Inviato','Accettato','Rifiutato'],
   invStatus:['Bozza','Inviata','Pagata','Scaduta','Annullata'],
@@ -492,7 +492,7 @@ function pmoney(n){return Number(n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/
 function dateIt(s){if(!s)return '—';const d=new Date(s);if(isNaN(d))return s;return d.toLocaleDateString('it-CH')}
 function todayISO(){return new Date().toISOString().slice(0,10)}
 function addDays(iso,n){const d=new Date(iso||todayISO());d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
-function leadScore(lead,company){let s=0;const det=[];const emp=company?Number(company.employees||0):0;
+function leadScore(lead,company){let s=0;const det=[];const emp=Number((lead&&lead.employees)||(company&&company.employees)||0);
   if(emp>100){s+=20;det.push('Azienda >100 dip.')} if(lead.budget&&ENUM.budget.indexOf(lead.budget)>=1){s+=20;det.push('Budget disponibile')}
   if(lead.authority==='Decision maker'){s+=20;det.push('Decision maker')} if(lead.timing&&ENUM.timing.indexOf(lead.timing)<=1){s+=20;det.push('Entro 6 mesi')}
   if(lead.interest){s+=20;det.push('Interesse confermato')} return {score:s,det};}
@@ -575,26 +575,28 @@ function setPeriod(p){DASH_PERIOD=p;render();}
 function setDashFrom(v){DASH_FROM=v;DASH_PERIOD='custom';render();}
 function setDashTo(v){DASH_TO=v;DASH_PERIOD='custom';render();}
 const DASH_WIDGETS=[
- {id:'partner',label:'KPI · Partner / Fornitori'},{id:'quotesOpen',label:'KPI · Preventivi aperti'},
+ {id:'clients',label:'KPI · Clienti'},{id:'leadCos',label:'KPI · Lead'},{id:'partner',label:'KPI · Partner'},
+ {id:'suppliers',label:'KPI · Fornitori'},{id:'quotesOpen',label:'KPI · Preventivi aperti'},
  {id:'ordersOpen',label:'KPI · Ordini cliente aperti'},{id:'fatturato',label:'KPI · Fatturato (periodo)'},
- {id:'quoteAmount',label:'KPI · Preventivi (periodo)'},{id:'pipelineVal',label:'KPI · Valore pipeline'},
+ {id:'quoteAmount',label:'KPI · Preventivi (periodo)'},
  {id:'arr',label:'KPI · ARR ricorrente'},{id:'openOpp',label:'KPI · Opportunità aperte'},
- {id:'winRate',label:'KPI · Win rate'},{id:'clients',label:'KPI · Clienti'},
+ {id:'winRate',label:'KPI · Win rate'},
  {id:'chart',label:'Grafico fatturato vs preventivi'},{id:'funnel',label:'Funnel pipeline'},
  {id:'hotleads',label:'Lead più caldi'},{id:'topclients',label:'Top clienti'},
  {id:'reps',label:'Performance commerciali'}
 ];
 function dashKey(){return 'securgest_dash_'+((CURRENT_USER&&CURRENT_USER.email)||'')}
-function getDashSel(){try{const v=JSON.parse(LS.get(dashKey())||'null');if(Array.isArray(v))return v;}catch(e){}return DASH_WIDGETS.map(w=>w.id);}
+function getDashSel(){try{const v=JSON.parse(LS.get(dashKey())||'null');if(Array.isArray(v)){const NEW=['clients','leadCos','partner','suppliers'];const add=NEW.filter(id=>!v.includes(id)&&!v.includes('__seen_'+id));return [...v,...add];}}catch(e){}return DASH_WIDGETS.map(w=>w.id);}
 function dashCustomize(){const sel=getDashSel();openModal('Personalizza dashboard',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Scegli quali riquadri mostrare nella dashboard.</div><div class="checks" style="grid-template-columns:repeat(2,1fr)">${DASH_WIDGETS.map(w=>`<label class="${sel.includes(w.id)?'on':''}"><input type="checkbox" class="dashchk" value="${w.id}" ${sel.includes(w.id)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${esc(w.label)}</label>`).join('')}</div>`,async()=>{const ids=[...document.querySelectorAll('.dashchk:checked')].map(x=>x.value);LS.set(dashKey(),JSON.stringify(ids));},{saveLabel:'Applica'});}
 VIEWS.dashboard=async(c)=>{
   const [leads,companies,licenses,quotes,invoices,sorders]=await Promise.all([store.list('leads'),store.list('companies'),store.list('licenses'),store.list('quotes'),store.list('invoices'),store.list('sales_orders')]);
-  const partners=companies.filter(x=>(x.types||[]).includes('Partner')||(x.types||[]).includes('Fornitore'));
+  const partners=companies.filter(x=>(x.types||[]).includes('Partner'));
+  const suppliers=companies.filter(x=>(x.types||[]).includes('Fornitore'));
   const clients=companies.filter(x=>(x.types||[]).includes('Cliente'));
+  const leadCos=companies.filter(x=>(x.types||[]).includes('Lead'));
   const P=DASH_PERIOD;
   const compById=Object.fromEntries(companies.map(x=>[x.id,x]));
   const open=leads.filter(l=>l.stage!=='Chiuso vinto'&&l.stage!=='Chiuso perso');
-  const pipelineVal=open.reduce((s,l)=>s+contractValue(l),0);
   const arr=licenses.filter(l=>l.status==='Attiva'||l.status==='In rinnovo').reduce((s,l)=>s+Number(l.value_annual||0),0);
   const quotesOpen=quotes.filter(q=>q.status==='Bozza'||q.status==='Inviato').length;
   const ordersOpen=sorders.filter(o=>o.status==='Aperto'||o.status==='In lavorazione').length;
@@ -623,8 +625,8 @@ VIEWS.dashboard=async(c)=>{
   const funnelCard=`<div class="card"><div class="hd"><h3>Pipeline per fase</h3></div><div class="funnel">${funnel}</div></div>`;
   const hotCard=`<div class="card"><div class="hd"><h3>Lead più caldi</h3></div><div class="bd"><table><tbody>${leads.map(l=>({l,sc:leadScore(l,compById[l.company]).score})).sort((a,b)=>b.sc-a.sc).slice(0,6).map(({l,sc})=>`<tr onclick="editLead('${l.id}')"><td><b>${esc((compById[l.company]||{}).name||'—')}</b><br><span style="color:var(--muted);font-size:12.5px">${esc(l.title||'')}</span></td><td style="text-align:right">${scoreBar(sc)}</td></tr>`).join('')||'<tr><td class="empty">Nessun lead</td></tr>'}</tbody></table></div></div>`;
   const topCard=`<div class="card"><div class="hd"><h3>Top clienti per fatturato</h3></div><div class="bd"><table><tbody>${top.map(([id,v])=>`<tr><td><b>${esc((compById[id]||{}).name||'—')}</b></td><td class="num">${money(v)}</td></tr>`).join('')||'<tr><td class="empty">Nessuna fattura</td></tr>'}</tbody></table></div></div>`;
-  const kpiVals={partner:partners.length,quotesOpen:quotesOpen,ordersOpen:ordersOpen,fatturato:moneyShort(fatturato),quoteAmount:moneyShort(quoteAmount),pipelineVal:moneyShort(pipelineVal),arr:moneyShort(arr),openOpp:open.length,winRate:winRate+'<small>%</small>',clients:(clients.length||companies.length)};
-  const kpiLabels={partner:'Partner / Fornitori',quotesOpen:'Preventivi aperti',ordersOpen:'Ordini cliente aperti',fatturato:'Fatturato (periodo)',quoteAmount:'Preventivi (periodo)',pipelineVal:'Valore pipeline',arr:'Ricavo ricorrente (ARR)',openOpp:'Opportunità aperte',winRate:'Win rate',clients:'Clienti'};
+  const kpiVals={clients:clients.length,leadCos:leadCos.length,partner:partners.length,suppliers:suppliers.length,quotesOpen:quotesOpen,ordersOpen:ordersOpen,fatturato:moneyShort(fatturato),quoteAmount:moneyShort(quoteAmount),arr:moneyShort(arr),openOpp:open.length,winRate:winRate+'<small>%</small>'};
+  const kpiLabels={clients:'Clienti',leadCos:'Lead',partner:'Partner',suppliers:'Fornitori',quotesOpen:'Preventivi aperti',ordersOpen:'Ordini cliente aperti',fatturato:'Fatturato (periodo)',quoteAmount:'Preventivi (periodo)',arr:'Ricavo ricorrente (ARR)',openOpp:'Opportunità aperte',winRate:'Win rate'};
   const repAgg={};
   const addRep=(name,key,val)=>{name=(name||'—').trim()||'—';repAgg[name]=repAgg[name]||{q:0,qv:0,o:0,ov:0,iv:0};repAgg[name][key]+=val;};
   quotes.filter(q=>inPeriod(q.date,P)).forEach(q=>{addRep(q.commercial_ref,'q',1);addRep(q.commercial_ref,'qv',docTotals(q).total);});
@@ -634,7 +636,7 @@ VIEWS.dashboard=async(c)=>{
   const repCard=`<div class="card"><div class="hd"><h3>Performance commerciali · periodo selezionato</h3></div><div class="bd"><table><thead><tr><th>Commerciale</th><th class="num">Preventivi</th><th class="num">Valore prev.</th><th class="num">Ordini</th><th class="num">Valore ordini</th><th class="num">Fatturato</th></tr></thead><tbody>${repRows.map(([n,r])=>`<tr><td><b>${esc(n)}</b></td><td class="num">${r.q}</td><td class="num">${moneyShort(r.qv)}</td><td class="num">${r.o}</td><td class="num">${moneyShort(r.ov)}</td><td class="num">${moneyShort(r.iv)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nessun dato nel periodo</td></tr>'}</tbody></table></div></div>`;
   const secCards={chart:chartCard,funnel:funnelCard,hotleads:hotCard,topclients:topCard};
   const sel=getDashSel();
-  const kpiIds=['partner','quotesOpen','ordersOpen','fatturato','quoteAmount','pipelineVal','arr','openOpp','winRate','clients'].filter(k=>sel.includes(k));
+  const kpiIds=['clients','leadCos','partner','suppliers','quotesOpen','ordersOpen','fatturato','quoteAmount','arr','openOpp','winRate'].filter(k=>sel.includes(k));
   const kpisHtml=kpiIds.map(k=>`<div class="kpi"><div class="lab">${kpiLabels[k]}</div><div class="val">${kpiVals[k]}</div></div>`).join('');
   const secSel=['chart','funnel','hotleads','topclients'].filter(s=>sel.includes(s));
   let secHtml='';for(let i=0;i<secSel.length;i+=2){secHtml+=`<div class="grid2" style="margin-bottom:18px">${secCards[secSel[i]]}${secSel[i+1]?secCards[secSel[i+1]]:''}</div>`;}
@@ -649,16 +651,16 @@ VIEWS.dashboard=async(c)=>{
 };
 
 /* ===== LEADS / PIPELINE / COMPANIES / CONTACTS (come prima) ===== */
-VIEWS.leads=async(c)=>{const [leads,companies]=await Promise.all([store.list('leads'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca lead, azienda…','sLead')}<span style="color:var(--muted);font-size:12.5px">${leads.length} lead</span></div>
+VIEWS.leads=async(c)=>{const leads=await store.list('leads');
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca lead, azienda…','sLead')}<button class="btn sm" onclick="editLead()">+ Nuovo lead</button><span style="color:var(--muted);font-size:12.5px;margin-left:8px">${leads.length} lead</span></div>
   <div class="card"><table><thead><tr><th>Azienda</th><th>Opportunità</th><th>Fase</th><th>Provenienza</th><th>Score</th><th class="num">Valore contratto</th><th></th></tr></thead><tbody>${
-  leads.map(l=>{const cm=comp[l.company]||{};const sc=leadScore(l,cm).score;const st=l.stage==='Chiuso vinto'?'g':l.stage==='Chiuso perso'?'r':'b';
-    return `<tr data-s="${esc((cm.name+' '+(l.title||'')+' '+l.stage).toLowerCase())}" onclick="editLead('${l.id}')"><td><b>${esc(cm.name||'—')}</b></td><td>${esc(l.title||'')}</td><td><span class="pill ${st}">${esc(l.stage)}</span></td><td>${esc(l.source||'—')}</td><td>${scoreBar(sc)}</td><td class="num">${money(contractValue(l))}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('leads','${l.id}')">🗑</button></td></tr>`;
-  }).join('')||'<tr><td colspan="7" class="empty">Nessun lead.</td></tr>'}</tbody></table></div>`;};
+  leads.map(l=>{const sc=leadScore(l).score;const st=l.converted?'g':l.stage==='Chiuso vinto'?'g':l.stage==='Chiuso perso'?'r':'b';const srcTxt=l.source?(l.source_detail?esc(l.source)+' ('+esc(l.source_detail)+')':esc(l.source)):'—';
+    return `<tr data-s="${esc(((l.company_name||'')+' '+(l.title||'')+' '+l.stage).toLowerCase())}" onclick="editLead('${l.id}')"><td><b>${esc(l.company_name||'—')}</b>${l.converted?' <span class="pill g" style="font-size:10px">convertito</span>':''}</td><td>${esc(l.title||'')}</td><td><span class="pill ${st}">${esc(l.stage)}</span></td><td>${srcTxt}</td><td>${scoreBar(sc)}</td><td class="num">${money(contractValue(l))}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('leads','${l.id}')">🗑</button></td></tr>`;
+  }).join('')||'<tr><td colspan="7" class="empty">Nessun lead. Usa "+ Nuovo lead" per crearne uno.</td></tr>'}</tbody></table></div>`;};
 
-VIEWS.pipeline=async(c)=>{const [leads,companies]=await Promise.all([store.list('leads'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));let cols='';
+VIEWS.pipeline=async(c)=>{const leads=await store.list('leads');let cols='';
   ENUM.pipeline.forEach(st=>{const items=leads.filter(l=>l.stage===st);const val=items.reduce((s,l)=>s+contractValue(l),0);
-    cols+=`<div style="min-width:230px;flex:1"><div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 8px"><b style="font-size:13px">${st}</b><span class="mono" style="font-size:12px;color:var(--muted)">${items.length}</span></div><div style="background:#eceae3;border-radius:10px;padding:8px;min-height:60px;display:flex;flex-direction:column;gap:8px">${items.map(l=>{const sc=leadScore(l,comp[l.company]).score;const lb=scoreLabel(sc);const col=lb.c==='hot'?'var(--hot)':lb.c==='warm'?'var(--warm)':'var(--cold)';return `<div onclick="editLead('${l.id}')" style="background:#fff;border:1px solid var(--line);border-left:3px solid ${col};border-radius:8px;padding:10px;cursor:pointer"><b style="font-size:12.5px">${esc((comp[l.company]||{}).name||'—')}</b><div style="color:var(--muted);font-size:11.5px;margin:3px 0">${esc(l.title||'')}</div><div style="display:flex;justify-content:space-between;font-size:11px"><span class="mono">${moneyShort(contractValue(l))}</span><span class="mono">${sc}</span></div></div>`;}).join('')||'<div style="color:var(--muted);font-size:12px;text-align:center;padding:8px">—</div>'}<div style="font-size:11px;color:var(--muted);text-align:right;padding:2px 4px">${moneyShort(val)}</div></div></div>`;});
+    cols+=`<div style="min-width:230px;flex:1"><div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px 8px"><b style="font-size:13px">${st}</b><span class="mono" style="font-size:12px;color:var(--muted)">${items.length}</span></div><div style="background:#eceae3;border-radius:10px;padding:8px;min-height:60px;display:flex;flex-direction:column;gap:8px">${items.map(l=>{const sc=leadScore(l).score;const lb=scoreLabel(sc);const col=lb.c==='hot'?'var(--hot)':lb.c==='warm'?'var(--warm)':'var(--cold)';return `<div onclick="editLead('${l.id}')" style="background:#fff;border:1px solid var(--line);border-left:3px solid ${col};border-radius:8px;padding:10px;cursor:pointer"><b style="font-size:12.5px">${esc(l.company_name||'—')}</b><div style="color:var(--muted);font-size:11.5px;margin:3px 0">${esc(l.title||'')}</div><div style="display:flex;justify-content:space-between;font-size:11px"><span class="mono">${moneyShort(contractValue(l))}</span><span class="mono">${sc}</span></div></div>`;}).join('')||'<div style="color:var(--muted);font-size:12px;text-align:center;padding:8px">—</div>'}<div style="font-size:11px;color:var(--muted);text-align:right;padding:2px 4px">${moneyShort(val)}</div></div></div>`;});
   c.innerHTML=`<div class="callout">Apri un lead per cambiarne fase e BANT: lo score si ricalcola automaticamente.</div><div style="display:flex;gap:14px;overflow-x:auto;padding-bottom:10px">${cols}</div>`;};
 
 let COMP_FILTER='Tutti';
@@ -1031,7 +1033,7 @@ async function zefixPick(i){
 let ZFX_PENDING_SIG=null;
 function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
     <div class="field"><label>Ragione sociale *</label><div style="position:relative"><input id="co_name" value="${esc(co.name||'')}" autocomplete="off" oninput="zefixSearch()" placeholder="Inizia a digitare (ricerca su Zefix)…"><div id="zefixBox" class="zefix-box"></div></div></div>${f('P.IVA / N. IVA','co_vat',co.vat_number)}
-    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
+    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
     <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     ${f('Telefono','co_phone',co.phone)}${f('Email','co_email',co.email,'email')}
@@ -1076,7 +1078,7 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
   }
   openModal(id?'Modifica azienda':'Nuova azienda',`<div class="fgrid"><div class="sec-title">Anagrafica</div>
     ${f('Ragione sociale *','co_name',co.name)}${f('P.IVA / N. IVA','co_vat',co.vat_number)}
-    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(4,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
+    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
     <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     ${f('Telefono','co_phone',co.phone)}${f('Email','co_email',co.email,'email')}
@@ -1175,11 +1177,16 @@ async function editContact(id,presetCompany,afterSave){const p=id?await store.ge
 
 /* LEAD */
 async function editLead(id){const l=id?await store.get('leads',id):{stage:'Lead acquisito',canone:'Annuale'};
-  const comps=await refOptions('companies',r=>r.name);const cons=await store.list('contacts');const companies=await store.list('companies');const compById=Object.fromEntries(companies.map(x=>[x.id,x]));
-  const conOpts=cons.map(x=>({id:x.id,label:x.first_name+' '+x.last_name+' — '+((compById[x.company]||{}).name||'')}));const users=await refOptions('app_users',r=>r.full_name);
-  openModal(id?'Modifica lead':'Nuovo lead',`<div class="fgrid"><div class="sec-title">Opportunità</div>
-    ${f('Titolo opportunità *','ld_title',l.title)}${f('Azienda *','ld_co',l.company,'ref',comps)}
-    ${f('Contatto','ld_ct',l.contact,'ref',conOpts)}${f('Provenienza','ld_src',l.source,'select',ENUM.sources)}
+  const users=await refOptions('app_users',r=>r.full_name);
+  const conv=l.converted?`<div class="full callout" style="background:#e9f7ed;border-color:#bfe3c9;color:#1f7a3d">✓ Lead convertito in cliente${l.converted_company?' — azienda creata in anagrafica':''}.</div>`:'';
+  openModal(id?'Modifica lead':'Nuovo lead',`<div class="fgrid">${conv}<div class="sec-title">Opportunità</div>
+    ${f('Titolo opportunità *','ld_title',l.title)}${f('Azienda (nome) *','ld_coname',l.company_name)}
+    ${f('Settore','ld_sector',l.sector,'datalist',['Informatica / IT e Telecomunicazioni','Servizi','Industria / Manifatturiero','Commercio / Retail','Edilizia','Sanità / Farmaceutico','Finanza / Assicurazioni','Studi professionali','Pubblica amministrazione','Trasporti / Logistica','Turismo / Ristorazione','Agricoltura','Energia / Utilities','Immobiliare','Formazione','Media / Comunicazione','Altro'])}${f('N. dipendenti','ld_emp',l.employees,'number')}
+    <div class="sec-title">Referente</div>
+    ${f('Nome referente','ld_cname',l.contact_name)}${f('Ruolo','ld_crole',l.contact_role)}
+    ${f('Email','ld_cemail',l.contact_email,'email')}${f('Telefono','ld_cphone',l.contact_phone)}
+    <div class="sec-title">Provenienza</div>
+    ${f('Canale','ld_src',l.source,'select',ENUM.sources)}${f('Nome partner / segnalatore','ld_srcdet',l.source_detail)}
     ${f('Esigenza / pain point','ld_pain',l.pain,'select',ENUM.pains)}${f('Concorrente in gioco','ld_comp',l.competitor)}
     <div class="sec-title">Qualifica BANT</div>
     ${f('Budget','ld_budget',l.budget,'select',['',...ENUM.budget])}${f('Authority (potere)','ld_auth',l.authority,'select',['',...ENUM.authority])}
@@ -1188,12 +1195,28 @@ async function editLead(id){const l=id?await store.get('leads',id):{stage:'Lead 
     ${f('Fase pipeline','ld_stage',l.stage,'select',ENUM.pipeline)}${f('Assegna a','ld_owner',l.owner,'ref',users)}
     ${f('Valore una tantum (setup)','ld_setup',l.setup_value,'number')}${f('Canone annuo','ld_rec',l.recurring_annual,'number')}
     ${f('Tipo canone','ld_canone',l.canone,'select',ENUM.canone)}<div></div>
-    ${f('Note','ld_notes',l.notes,'textarea')}<div class="full" id="scorePreview"></div></div>`,async()=>{
-    const o={title:gv('ld_title'),company:gv('ld_co'),contact:gv('ld_ct'),source:gv('ld_src'),pain:gv('ld_pain'),competitor:gv('ld_comp'),budget:gv('ld_budget'),authority:gv('ld_auth'),timing:gv('ld_timing'),interest:gv('ld_interest'),stage:gv('ld_stage'),owner:gv('ld_owner'),setup_value:parseFloat(gv('ld_setup'))||0,recurring_annual:parseFloat(gv('ld_rec'))||0,canone:gv('ld_canone'),notes:gv('ld_notes')};
-    if(!o.title||!o.company)throw new Error('Titolo e azienda obbligatori');o.score=leadScore(o,compById[o.company]).score;id?await store.update('leads',id,o):await store.insert('leads',o);});
-  const upd=()=>{const tmp={budget:gv('ld_budget'),authority:gv('ld_auth'),timing:gv('ld_timing'),interest:gv('ld_interest'),setup_value:parseFloat(gv('ld_setup'))||0,recurring_annual:parseFloat(gv('ld_rec'))||0,canone:gv('ld_canone')};const co=compById[gv('ld_co')];const sc=leadScore(tmp,co);const lb=scoreLabel(sc.score);const col=lb.c==='hot'?'var(--hot)':lb.c==='warm'?'var(--warm)':'var(--cold)';
+    ${f('Note','ld_notes',l.notes,'textarea')}<div class="full" id="scorePreview"></div>
+    ${id&&!l.converted?`<div class="full" style="display:flex;justify-content:flex-end;margin-top:6px"><button type="button" class="btn" onclick="convertLead('${id}')">★ Converti in cliente</button></div>`:''}</div>`,async()=>{
+    const o={title:gv('ld_title'),company_name:gv('ld_coname'),sector:gv('ld_sector'),employees:parseInt(gv('ld_emp'))||null,contact_name:gv('ld_cname'),contact_role:gv('ld_crole'),contact_email:gv('ld_cemail'),contact_phone:gv('ld_cphone'),source:gv('ld_src'),source_detail:gv('ld_srcdet'),pain:gv('ld_pain'),competitor:gv('ld_comp'),budget:gv('ld_budget'),authority:gv('ld_auth'),timing:gv('ld_timing'),interest:gv('ld_interest'),stage:gv('ld_stage'),owner:gv('ld_owner'),setup_value:parseFloat(gv('ld_setup'))||0,recurring_annual:parseFloat(gv('ld_rec'))||0,canone:gv('ld_canone'),notes:gv('ld_notes')};
+    if(!o.title||!o.company_name)throw new Error('Titolo e nome azienda obbligatori');o.score=leadScore(o).score;id?await store.update('leads',id,o):await store.insert('leads',o);});
+  const upd=()=>{const tmp={employees:parseInt(gv('ld_emp'))||0,budget:gv('ld_budget'),authority:gv('ld_auth'),timing:gv('ld_timing'),interest:gv('ld_interest'),setup_value:parseFloat(gv('ld_setup'))||0,recurring_annual:parseFloat(gv('ld_rec'))||0,canone:gv('ld_canone')};const sc=leadScore(tmp);const lb=scoreLabel(sc.score);const col=lb.c==='hot'?'var(--hot)':lb.c==='warm'?'var(--warm)':'var(--cold)';
     document.getElementById('scorePreview').innerHTML=`<div style="background:#16181f;color:#fff;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px"><div style="font-family:var(--disp);font-size:30px;font-weight:800">${sc.score}<small style="font-size:14px;opacity:.6">/100</small></div><div style="flex:1"><div style="font-weight:700">${lb.t}</div><div style="font-size:11.5px;opacity:.7">${sc.det.join(' · ')||'Nessun criterio'}</div></div><div style="text-align:right"><div style="font-size:11px;opacity:.6">Valore contratto (${tmp.canone||'—'})</div><div class="mono" style="font-size:16px;font-weight:700">${money(contractValue(tmp))}</div></div><div style="width:8px;height:46px;border-radius:4px;background:${col}"></div></div>`;};
-  ['ld_budget','ld_auth','ld_timing','ld_interest','ld_setup','ld_rec','ld_canone','ld_co'].forEach(idd=>{const e=document.getElementById(idd);if(e){e.addEventListener('change',upd);e.addEventListener('input',upd);}});upd();}
+  ['ld_budget','ld_auth','ld_timing','ld_interest','ld_setup','ld_rec','ld_canone','ld_emp'].forEach(idd=>{const e=document.getElementById(idd);if(e){e.addEventListener('change',upd);e.addEventListener('input',upd);}});upd();}
+
+async function convertLead(id){
+  const l=await store.get('leads',id);if(!l)return;
+  if(!confirm('Convertire "'+(l.company_name||'questo lead')+'" in cliente?\n\nVerrà creata una nuova azienda (tipo Cliente) in anagrafica con i dati del lead'+(l.contact_name?' e il referente come contatto':'')+'.'))return;
+  // crea azienda
+  const co={name:l.company_name,types:['Cliente'],sector:l.sector||'',employees:l.employees||null,country:'Svizzera',notes:l.notes||''};
+  const newCo=await store.insert('companies',co);
+  const coId=(newCo&&newCo.id)||(Array.isArray(newCo)&&newCo[0]&&newCo[0].id);
+  // crea contatto se presente
+  if(l.contact_name){const parts=(l.contact_name||'').trim().split(' ');const fn=parts.shift()||l.contact_name;const ln=parts.join(' ')||'—';
+    await store.insert('contacts',{first_name:fn,last_name:ln,company:coId,role_title:l.contact_role||'',email:l.contact_email||'',phone:l.contact_phone||''});}
+  // marca il lead come convertito
+  await store.update('leads',id,{converted:true,converted_company:coId,stage:'Chiuso vinto'});
+  closeModal();toast('Lead convertito: azienda cliente creata');render();
+}
 
 /* LICENSE */
 async function editLicense(id){const l=id?await store.get('licenses',id):{status:'POC / Demo in corso',canone:'Annuale'};const comps=await refOptions('companies',r=>r.name);const prods=(await store.list('products')).filter(p=>p.type==='Licenza'||p.type==='Software').map(p=>({id:p.id,label:p.name}));
