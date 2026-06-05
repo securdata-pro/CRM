@@ -1068,7 +1068,7 @@ async function zefixPick(i){
 let ZFX_PENDING_SIG=null;
 function companyFieldsHtml(co,lists){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
     <div class="field"><label>Ragione sociale *</label><div style="position:relative"><input id="co_name" value="${esc(co.name||'')}" autocomplete="off" oninput="zefixSearch()" placeholder="Inizia a digitare (ricerca su Zefix)…"><div id="zefixBox" class="zefix-box"></div></div></div>${f('P.IVA / N. IVA','co_vat',co.vat_number)}
-    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
+    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked);toggleInfoSection()">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
     <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     ${f('Telefono','co_phone',co.phone)}${f('Email','co_email',co.email,'email')}
@@ -1076,10 +1076,11 @@ function companyFieldsHtml(co,lists){const ctypes=co.types||[];return `<div clas
     ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
     ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
-    <div class="sec-title">Informazioni</div>
+    <div class="full" id="infoSection" style="display:contents"><div class="sec-title">Informazioni</div>
     ${f('Tipo attività','co_acttype',co.activity_type,'select',['',...((lists&&lists.activity)||[])])}${f('Interessato a','co_interest',co.interest,'select',['',...((lists&&lists.interest)||[])])}
-    ${f('Note','co_notes',co.notes,'textarea')}</div>`;}
+    ${f('Note','co_notes',co.notes,'textarea')}</div></div>`;}
 function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),phone:gv('co_phone'),email:gv('co_email'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),activity_type:gv('co_acttype'),interest:gv('co_interest'),notes:gv('co_notes')};}
+function toggleInfoSection(){const sec=document.getElementById('infoSection');if(!sec)return;const types=[...document.querySelectorAll('.cotype:checked')].map(x=>x.value);const show=types.includes('Cliente')||types.includes('Partner');sec.style.display=show?'contents':'none';}
 async function editCompany(id){const co=id?await store.get('companies',id):{};
   const ctypes=co.types||[];
   const COMPLISTS={activity:await getCustomList('activity_types'),interest:await getCustomList('interests')};
@@ -1113,7 +1114,7 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
   }
   openModal(id?'Modifica azienda':'Nuova azienda',`<div class="fgrid"><div class="sec-title">Anagrafica</div>
     ${f('Ragione sociale *','co_name',co.name)}${f('P.IVA / N. IVA','co_vat',co.vat_number)}
-    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
+    <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked);toggleInfoSection()">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
     <div class="field"><label>Città</label><input id="co_city" value="${esc(co.city||'')}" onchange="chCityToZip()"></div>${f('Paese','co_country',co.country||'Svizzera','datalist',ENUM.countries)}
     ${f('Telefono','co_phone',co.phone)}${f('Email','co_email',co.email,'email')}
@@ -1121,13 +1122,13 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
     ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
-    <div class="sec-title">Informazioni</div>
+    <div class="full" id="infoSection" style="display:contents"><div class="sec-title">Informazioni</div>
     ${f('Tipo attività','co_acttype',co.activity_type,'select',['',...COMPLISTS.activity])}${f('Interessato a','co_interest',co.interest,'select',['',...COMPLISTS.interest])}
-    ${f('Note','co_notes',co.notes,'textarea')}</div>${related}`,async()=>{
+    ${f('Note','co_notes',co.notes,'textarea')}</div></div>${related}`,async()=>{
     const o=readCompanyForm();
     if(!o.name)throw new Error('Ragione sociale obbligatoria');
     if(ZFX_PENDING_SIG&&ZFX_PENDING_SIG.length){o.signatories=JSON.stringify(ZFX_PENDING_SIG);ZFX_PENDING_SIG=null;}
-    id?await store.update('companies',id,o):await store.insert('companies',o);},{wide:true});}
+    id?await store.update('companies',id,o):await store.insert('companies',o);},{wide:true});toggleInfoSection();}
 
 async function getSignatories(companyId){const co=await store.get('companies',companyId);let s=[];try{s=Array.isArray(co.signatories)?co.signatories:(co.signatories?JSON.parse(co.signatories):[]);}catch(e){s=[];}return {co,list:s};}
 async function addSignatory(companyId){
@@ -1503,7 +1504,7 @@ async function newPartyCompany(isSupplier){
     const co=await store.insert('companies',o);
     const sel=document.getElementById('dc_party');if(sel){const op=document.createElement('option');op.value=co.id;op.textContent=co.name;sel.appendChild(op);sel.value=co.id;}
     toast('Azienda creata e selezionata nel documento.');
-  },{wide:true,saveLabel:'Salva azienda'});}
+  },{wide:true,saveLabel:'Salva azienda'});toggleInfoSection();}
 function addLine(vat){LINE_BUF.push({code:'',desc:'',qty:1,price:0,vat:vat||0});renderLines();}
 async function addFromCatalog(pid){if(!pid)return;collectLines();const p=await store.get('products',pid);if(p){if(LINE_BUF.length===1&&!LINE_BUF[0].desc&&!LINE_BUF[0].price)LINE_BUF=[];LINE_BUF.push({code:p.code||'',desc:p.name||'',qty:1,price:Number(p.unit_price)||0,vat:Number(p.vat)||0});renderLines();}}
 function collectLines(){LINE_BUF=[...document.querySelectorAll('#lineRows tr')].map(tr=>({code:tr.querySelector('.ln-code').value,desc:tr.querySelector('.ln-desc').value,qty:parseFloat(tr.querySelector('.ln-qty').value)||0,price:parseFloat(tr.querySelector('.ln-price').value)||0,vat:parseFloat(tr.querySelector('.ln-vat').value)||0,disc:parseFloat(tr.querySelector('.ln-disc').value)||0}));}
