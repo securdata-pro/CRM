@@ -1614,40 +1614,82 @@ const EXP_CATS=['Hardware','Software','Licenze','Servizi','Consulenze','Affitto'
 let EXP_PENDING_FILE=null;
 function moneyc(n,cur){n=Number(n||0);return n.toLocaleString('it-CH',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(cur||CUR);}
 
+let EX_LINES=[];
 VIEWS.expenses=async(c)=>{const [rows,companies]=await Promise.all([store.list('expenses'),store.list('companies')]);const comp=Object.fromEntries(companies.map(x=>[x.id,x]));
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca spesa…','sEXP')}<span style="color:var(--muted);font-size:12.5px">${rows.length} spese</span><div class="spacer"></div><button class="btn ghost" onclick="importExpensePdf()">📥 Importa PDF</button><button class="btn ghost" onclick="openRegister('expenses')">📊 Registro</button><button class="btn red" onclick="editExpense()">+ Nuova spesa</button></div>
-  <div class="card"><table><thead><tr><th>Data</th><th>N° fattura</th><th>Fornitore</th><th class="num">Imponibile</th><th class="num">IVA</th><th class="num">Totale</th><th>Stato</th><th></th></tr></thead><tbody>${
-  rows.map(r=>{const cm=comp[r.supplier]||{};const stc=r.status==='Pagata'?'g':'a';
-    return `<tr data-s="${esc(((r.number||'')+' '+(cm.name||'')).toLowerCase())}" onclick="editExpense('${r.id}')"><td>${dateIt(r.date)}</td><td class="mono">${esc(r.number||'—')}</td><td>${esc(cm.name||'—')}</td><td class="num mono">${moneyc(r.net,r.currency)}</td><td class="num mono">${moneyc(r.vat_amount,r.currency)}</td><td class="num mono">${moneyc(r.total,r.currency)}</td><td><span class="pill ${stc}">${esc(r.status||'Da pagare')}</span></td><td class="rowact">${(r.pdf_path||r.pdf_data)?`<button class="iconbtn" title="Apri PDF" onclick="event.stopPropagation();viewExpensePdf('${r.id}')">📄</button>`:''}<button class="iconbtn" onclick="event.stopPropagation();delRow('expenses','${r.id}')">🗑</button></td></tr>`;
-  }).join('')||'<tr><td colspan="8" class="empty">Nessuna spesa registrata.</td></tr>'}</tbody></table></div>`;};
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca spesa…','sEXP')}<span style="color:var(--muted);font-size:12.5px">${rows.length} spese</span><div class="spacer"></div><button class="btn ghost" onclick="importExpensePdf()">📥 Importa PDF</button><button class="btn ghost" onclick="exportAllExpenses()">🖨 Esporta tutte (PDF)</button><button class="btn ghost" onclick="openRegister('expenses')">📊 Registro</button><button class="btn red" onclick="editExpense()">+ Nuova spesa</button></div>
+  <div class="card"><table><thead><tr><th>Data</th><th>N° fattura</th><th>Fornitore</th><th>Descrizione</th><th class="num">Imponibile</th><th class="num">IVA</th><th class="num">Totale</th><th>Stato</th><th></th></tr></thead><tbody>${
+  rows.map(r=>{const cm=comp[r.supplier]||{};const stc=r.status==='Pagata'?'g':'a';const desc=(r.lines&&r.lines.length?r.lines.map(l=>l.desc).filter(Boolean).join(' · '):'')||'';
+    return `<tr data-s="${esc(((r.number||'')+' '+(cm.name||'')+' '+desc).toLowerCase())}" onclick="editExpense('${r.id}')"><td>${dateIt(r.date)}</td><td class="mono">${esc(r.number||'—')}</td><td>${esc(cm.name||'—')}</td><td style="font-size:12px;color:#555;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(desc||'—')}</td><td class="num mono">${moneyc(r.net,r.currency)}</td><td class="num mono">${moneyc(r.vat_amount,r.currency)}</td><td class="num mono">${moneyc(r.total,r.currency)}</td><td><span class="pill ${stc}">${esc(r.status||'Da pagare')}</span></td><td class="rowact">${(r.pdf_path||r.pdf_data)?`<button class="iconbtn" title="Apri PDF originale" onclick="event.stopPropagation();viewExpensePdf('${r.id}')">📄</button>`:''}<button class="iconbtn" title="Stampa fattura" onclick="event.stopPropagation();printExpense('${r.id}')">🖨</button><button class="iconbtn" onclick="event.stopPropagation();delRow('expenses','${r.id}')">🗑</button></td></tr>`;
+  }).join('')||'<tr><td colspan="9" class="empty">Nessuna spesa registrata.</td></tr>'}</tbody></table></div>`;};
+
+function exTotals(){let net=0,tax=0;EX_LINES.forEach(l=>{const a=(Number(l.qty)||0)*(Number(l.price)||0)*(1-((Number(l.disc)||0)/100));net+=a;tax+=a*(Number(l.vat)||0)/100;});return{net,tax,total:net+tax};}
+function exUpdTot(){const t=exTotals();const cur=val('ex_cur')||'CHF';const el=document.getElementById('exTotSummary');if(el)el.innerHTML=`Imponibile <b>${moneyc(t.net,cur)}</b> &nbsp;·&nbsp; IVA <b>${moneyc(t.tax,cur)}</b> &nbsp;·&nbsp; Totale <b>${moneyc(t.total,cur)}</b>`;}
+function exLineCalc(i){const cur=val('ex_cur')||'CHF';const l=EX_LINES[i]||{};const imp=(Number(l.qty)||0)*(Number(l.price)||0)*(1-((Number(l.disc)||0)/100));const sp=document.getElementById('exImp'+i);if(sp)sp.textContent=moneyc(imp,cur);exUpdTot();}
+function exRenderLines(){const cur=val('ex_cur')||'CHF';const b=document.getElementById('exLinesBody');if(!b)return;
+  b.innerHTML=EX_LINES.map((l,i)=>`<tr>
+    <td><input value="${esc(l.desc||'')}" oninput="EX_LINES[${i}].desc=this.value"></td>
+    <td style="width:60px" class="num"><input type="number" step="any" value="${l.qty==null?1:l.qty}" oninput="EX_LINES[${i}].qty=parseFloat(this.value)||0;exLineCalc(${i})"></td>
+    <td style="width:110px" class="num"><input type="number" step="any" value="${l.price||0}" oninput="EX_LINES[${i}].price=parseFloat(this.value)||0;exLineCalc(${i})"></td>
+    <td style="width:78px" class="num"><input type="number" step="any" value="${l.vat==null?0:l.vat}" oninput="EX_LINES[${i}].vat=parseFloat(this.value)||0;exLineCalc(${i})"></td>
+    <td style="width:104px" class="num mono"><span id="exImp${i}">${moneyc((Number(l.qty)||0)*(Number(l.price)||0)*(1-((Number(l.disc)||0)/100)),cur)}</span></td>
+    <td style="width:30px"><button class="iconbtn" title="Rimuovi" onclick="EX_LINES.splice(${i},1);exRenderLines()">✕</button></td></tr>`).join('');
+  exUpdTot();}
+function exAddLine(){EX_LINES.push({desc:'',qty:1,price:0,vat:8.1});exRenderLines();}
 
 async function editExpense(id,prefill){EXP_PENDING_FILE=(prefill&&prefill._file)||null;
   const companies=await store.list('companies');
   const r=id?(await store.get('expenses',id)||{}):(prefill||{});
+  EX_LINES=(r.lines&&r.lines.length)?JSON.parse(JSON.stringify(r.lines)):((r.net||r.total)?[{desc:(r.notes||'').replace(/^Rif\. fornitore:\s*/,'')||'Voce',qty:1,price:(r.net||r.total||0),vat:(r.net?Math.round((r.vat_amount||0)/r.net*1000)/10:0)}]:[{desc:'',qty:1,price:0,vat:8.1}]);
   const sup=companies.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(co=>`<option value="${co.id}" ${r.supplier===co.id?'selected':''}>${esc(co.name)}</option>`).join('');
   const body=`<div class="fgrid">
     <div class="field"><label>Fornitore</label><select id="ex_sup"><option value="">—</option>${sup}</select></div>
     <div class="field"><label>N° fattura fornitore</label><input id="ex_num" value="${esc(r.number||'')}"></div>
     <div class="field"><label>Data</label><input id="ex_date" type="date" value="${esc(r.date||new Date().toISOString().slice(0,10))}"></div>
     <div class="field"><label>Scadenza</label><input id="ex_due" type="date" value="${esc(r.due_date||'')}"></div>
-    <div class="field"><label>Valuta</label><select id="ex_cur">${ENUM.currencies.map(o=>`<option ${o===(r.currency||CUR)?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div class="field"><label>Valuta</label><select id="ex_cur" onchange="exRenderLines()">${ENUM.currencies.map(o=>`<option ${o===(r.currency||CUR)?'selected':''}>${o}</option>`).join('')}</select></div>
     <div class="field"><label>Categoria</label><input id="ex_cat" list="dlExpCats" value="${esc(r.category||'')}"></div>
-    <div class="field"><label>Imponibile</label><input id="ex_net" type="number" step="any" value="${r.net||0}" oninput="exRecalc()"></div>
-    <div class="field"><label>IVA (importo)</label><input id="ex_vat" type="number" step="any" value="${r.vat_amount||0}" oninput="exRecalc()"></div>
-    <div class="field"><label>Totale</label><input id="ex_total" type="number" step="any" value="${r.total||0}"></div>
     <div class="field"><label>Stato</label><select id="ex_status">${EXP_STATUS.map(o=>`<option ${o===(r.status||'Da pagare')?'selected':''}>${o}</option>`).join('')}</select></div>
+  </div>
+  <div style="margin-top:6px;font-weight:600;font-size:12.5px;margin-bottom:6px">Voci della fattura</div>
+  <table class="lines"><thead><tr><th>Descrizione</th><th class="num">Q.tà</th><th class="num">Prezzo</th><th class="num">IVA%</th><th class="num">Importo</th><th></th></tr></thead><tbody id="exLinesBody"></tbody></table>
+  <button class="btn ghost sm" onclick="exAddLine()">+ Voce</button>
+  <div id="exTotSummary" style="text-align:right;margin-top:8px;font-size:13px;color:#333"></div>
+  <div class="fgrid" style="margin-top:8px">
     <div class="field full"><label>Note</label><textarea id="ex_notes" rows="2">${esc(r.notes||'')}</textarea></div>
     <div class="field full"><label>PDF fattura ricevuta</label><input id="ex_pdf" type="file" accept="application/pdf" onchange="EXP_PENDING_FILE=this.files[0]||EXP_PENDING_FILE;var n=document.getElementById('ex_pdfname');if(n&&EXP_PENDING_FILE)n.textContent=EXP_PENDING_FILE.name"> <span id="ex_pdfname" style="font-size:12px;color:var(--muted)">${EXP_PENDING_FILE?esc(EXP_PENDING_FILE.name):(r.pdf_name?('Allegato: '+esc(r.pdf_name)):'')}</span></div>
   </div><datalist id="dlExpCats">${EXP_CATS.map(x=>`<option value="${x}">`).join('')}</datalist>`;
   openModal(id?'Modifica spesa':'Nuova spesa',body,()=>saveExpense(id),{wide:true,saveLabel:'Salva'});
+  exRenderLines();
 }
-function exRecalc(){const net=parseFloat(val('ex_net'))||0;const vat=parseFloat(val('ex_vat'))||0;const t=document.getElementById('ex_total');if(t)t.value=(net+vat).toFixed(2);}
-async function saveExpense(id){
-  const o={supplier:val('ex_sup'),number:val('ex_num'),date:val('ex_date'),due_date:val('ex_due'),currency:val('ex_cur'),category:val('ex_cat'),net:parseFloat(val('ex_net'))||0,vat_amount:parseFloat(val('ex_vat'))||0,total:parseFloat(val('ex_total'))||0,status:val('ex_status'),notes:val('ex_notes')};
+async function saveExpense(id){const t=exTotals();
+  const o={supplier:val('ex_sup'),number:val('ex_num'),date:val('ex_date'),due_date:val('ex_due'),currency:val('ex_cur'),category:val('ex_cat'),lines:EX_LINES.filter(l=>(l.desc||l.price)),net:Math.round(t.net*100)/100,vat_amount:Math.round(t.tax*100)/100,total:Math.round(t.total*100)/100,status:val('ex_status'),notes:val('ex_notes')};
   if(EXP_PENDING_FILE){const up=await uploadExpensePdf(EXP_PENDING_FILE);Object.assign(o,up);}
   if(id)await store.update('expenses',id,o); else await store.insert('expenses',o);
   EXP_PENDING_FILE=null;toast('Spesa salvata');
 }
+function expensePageHtml(r,sup,s,bank){const cur=r.currency||'CHF';const lines=(r.lines&&r.lines.length)?r.lines:[{desc:r.notes||'',qty:1,price:r.net||0,vat:0}];
+  const ref=(r.notes||'').replace(/^Rif\. fornitore:\s*/,'');
+  const rowsH=lines.map(l=>{const imp=(Number(l.qty)||0)*(Number(l.price)||0)*(1-((Number(l.disc)||0)/100));return `<tr><td>${esc(l.desc||'')}</td><td class="amt">${Number(l.qty)||0}</td><td class="amt">${moneyc(l.price,cur)}</td><td class="amt">${(Number(l.vat)||0)}%</td><td class="amt">${moneyc(imp,cur)}</td></tr>`;}).join('');
+  const bankH=bank?`<div style="margin-top:24px;font-size:11px;color:#444"><div style="color:#888;text-transform:uppercase;font-size:9.5px;letter-spacing:.04em">Termini di pagamento</div><div style="color:#888;text-transform:uppercase;font-size:9.5px;letter-spacing:.04em;margin-top:10px">Coordinate bancarie</div><div style="margin-top:4px;line-height:1.6">${esc(bank.holder||s.name||'')}<br>${esc(bank.bank||'')}<br>IBAN: ${esc(bank.iban||'')}<br>Codice SWIFT: ${esc(bank.swift||'')}</div></div>`:'';
+  return `<div class="page"><div class="doc" style="padding:40px 48px 96px;max-width:none;position:relative">
+   ${docHeadHtml(s)}
+   <div style="display:flex;justify-content:flex-end;margin-top:8px"><div style="width:48%"><div class="lb">INDIRIZZO FATTURAZIONE</div><div style="font-weight:700;margin-top:3px">${esc(sup.name||'—')}</div><div style="color:#555;line-height:1.6">${sup.address?esc(sup.address)+'<br>':''}${esc(((sup.zip||'')+' '+(sup.city||'')).trim())}${sup.vat_number?'<br>ID imposta: '+esc(sup.vat_number):''}</div></div></div>
+   <h2 style="font-family:var(--disp);font-weight:700;font-size:18px;margin:18px 0 14px">Fattura fornitore ${esc(r.number||'')}</h2>
+   <div style="display:flex;gap:40px;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:10px 0;margin-bottom:16px;font-size:12px"><div><div class="lb">DATA FATTURA:</div><div style="margin-top:2px">${dateIt(r.date)}</div></div><div><div class="lb">RIFERIMENTO:</div><div style="margin-top:2px">${esc(ref||'—')}</div></div></div>
+   <table class="it" style="width:100%"><thead><tr><th>Descrizione</th><th class="amt">Quantità</th><th class="amt">Prezzo unitario</th><th class="amt">Imposte</th><th class="amt">Importo</th></tr></thead><tbody>${rowsH}</tbody></table>
+   <div style="display:flex;justify-content:flex-end;margin-top:16px"><table style="font-size:12.5px;min-width:250px"><tr><td style="padding:3px 16px;color:#555">Importo</td><td class="amt mono">${moneyc(r.net,cur)}</td></tr><tr><td style="padding:3px 16px;color:#555">Imposte</td><td class="amt mono">${moneyc(r.vat_amount,cur)}</td></tr><tr style="font-weight:700;border-top:1px solid #333"><td style="padding:5px 16px">Totale</td><td class="amt mono">${moneyc(r.total,cur)}</td></tr></table></div>
+   ${bankH}
+   <div style="position:absolute;left:48px;right:48px;bottom:34px;border-top:1px solid #eee;padding-top:8px;font-size:9.5px;color:#999;text-align:center">${docFootLine(s)}</div>
+  </div></div>`;}
+async function printExpense(id){const r=await store.get('expenses',id);if(!r)return;const companies=await store.list('companies');const sup=companies.find(c=>c.id===r.supplier)||{};const s=await store.settings();const banks=await store.list('banks');const bank=banks.find(b=>b.is_default)||banks[0]||null;
+  document.getElementById('printroot').innerHTML=`<div class="printbar"><b>Fattura fornitore ${esc(r.number||'')}</b><div class="spacer"></div>${(r.pdf_path||r.pdf_data)?`<button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="viewExpensePdf('${r.id}')">📄 PDF originale</button>`:''}<button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div><div id="docpages">${expensePageHtml(r,sup,s,bank)}</div>`;
+  document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';closeModal();}
+async function exportAllExpenses(){const rows=(await store.list('expenses')).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));const companies=await store.list('companies');const comp=Object.fromEntries(companies.map(x=>[x.id,x]));const s=await store.settings();const banks=await store.list('banks');const bank=banks.find(b=>b.is_default)||banks[0]||null;
+  if(!rows.length){alert('Nessuna spesa da esportare.');return;}
+  const pages=rows.map(r=>expensePageHtml(r,comp[r.supplier]||{},s,bank)).join('');
+  document.getElementById('printroot').innerHTML=`<div class="printbar"><b>Tutte le fatture fornitori (${rows.length})</b><div class="spacer"></div><button class="btn red sm" onclick="printNow()">🖨 Stampa / Salva PDF</button><button class="btn ghost sm" style="color:#fff;border-color:#444" onclick="closePrint()">Chiudi</button></div><div id="docpages">${pages}</div>`;
+  document.getElementById('printroot').style.display='block';document.getElementById('app').style.display='none';}
+
 async function uploadExpensePdf(file){
   if(MODE==='supabase'&&SB){const path='expenses/'+Date.now()+'_'+file.name.replace(/[^A-Za-z0-9._-]/g,'_');
     const {error}=await SB.storage.from('fatture').upload(path,file,{upsert:true,contentType:'application/pdf'});
