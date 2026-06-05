@@ -652,7 +652,7 @@ VIEWS.dashboard=async(c)=>{
 
 /* ===== LEADS / PIPELINE / COMPANIES / CONTACTS (come prima) ===== */
 VIEWS.leads=async(c)=>{const leads=await store.list('leads');
-  c.innerHTML=`<div class="toolbar">${searchBox('Cerca lead, azienda…','sLead')}<button class="btn sm" onclick="editLead()">+ Nuovo lead</button><span style="color:var(--muted);font-size:12.5px;margin-left:8px">${leads.length} lead</span></div>
+  c.innerHTML=`<div class="toolbar">${searchBox('Cerca lead, azienda…','sLead')}<button class="btn sm" onclick="editLead()">+ Nuovo lead</button><button class="btn ghost sm" onclick="managePains()">⚙ Esigenze</button><span style="color:var(--muted);font-size:12.5px;margin-left:8px">${leads.length} lead</span></div>
   <div class="card"><table><thead><tr><th>Azienda</th><th>Opportunità</th><th>Fase</th><th>Provenienza</th><th>Score</th><th class="num">Valore contratto</th><th></th></tr></thead><tbody>${
   leads.map(l=>{const sc=leadScore(l).score;const st=l.converted?'g':l.stage==='Chiuso vinto'?'g':l.stage==='Chiuso perso'?'r':'b';const srcTxt=l.source?(l.source_detail?esc(l.source)+' ('+esc(l.source_detail)+')':esc(l.source)):'—';
     return `<tr data-s="${esc(((l.company_name||'')+' '+(l.title||'')+' '+l.stage).toLowerCase())}" onclick="editLead('${l.id}')"><td><b>${esc(l.company_name||'—')}</b>${l.converted?' <span class="pill g" style="font-size:10px">convertito</span>':''}</td><td>${esc(l.title||'')}</td><td><span class="pill ${st}">${esc(l.stage)}</span></td><td>${srcTxt}</td><td>${scoreBar(sc)}</td><td class="num">${money(contractValue(l))}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('leads','${l.id}')">🗑</button></td></tr>`;
@@ -832,6 +832,34 @@ VIEWS.documents=async(c)=>{const allDocs=await store.list('documents');
     <span style="color:var(--muted);font-size:12.5px;margin-left:8px">${docs.length} documenti</span></div>${cards}`;};
 
 async function getDocCategories(){const s=await store.settings();const DEF=['Schede tecniche','Contratti','Listini','Offerte','Certificazioni','Documenti legali','Altro'];let c;try{c=Array.isArray(s.doc_categories)?s.doc_categories:(s.doc_categories?JSON.parse(s.doc_categories):null);}catch(e){c=null;}return (c&&c.length)?c:DEF;}
+async function getPains(){const s=await store.settings();const DEF=['Virtualizzazione','Migrazione cloud','Backup e disaster recovery','Compliance GDPR','Cybersecurity','Business continuity','Artificial Intelligence','ERP','CRM','Networking'];let c;try{c=Array.isArray(s.pain_points)?s.pain_points:(s.pain_points?JSON.parse(s.pain_points):null);}catch(e){c=null;}return (c&&c.length)?c:DEF;}
+
+/* Liste personalizzabili generiche (salvate nelle impostazioni) */
+const CUSTOM_LISTS={
+  activity_types:{label:'Tipo attività',def:['Rivenditore','System Integrator','Studio professionale','Pubblica amministrazione','Industria','Commercio','Servizi','Sanità','Finanza','Altro']},
+  interests:{label:'Interessato a',def:['Virtualizzazione','Cybersecurity','Backup & Disaster Recovery','Cloud','Networking','Licenze software','Assistenza / manutenzione','Consulenza','Hardware','Altro']}
+};
+async function getCustomList(key){const s=await store.settings();const def=CUSTOM_LISTS[key].def;let c;try{c=Array.isArray(s[key])?s[key]:(s[key]?JSON.parse(s[key]):null);}catch(e){c=null;}return (c&&c.length)?c:def;}
+async function manageList(key){
+  const items=await getCustomList(key);const cfg=CUSTOM_LISTS[key];
+  const listHtml=items.map((p,ix)=>`<div class="urow" style="padding:8px 12px"><div class="uinfo"><b>${esc(p)}</b></div><button class="del-btn" onclick="removeListItem('${key}',${ix})">Rimuovi</button></div>`).join('');
+  openModal(cfg.label,`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Aggiungi o rimuovi le voci proposte per "${esc(cfg.label)}".</div>
+    <div class="userlist" id="listBox">${listHtml||'<div class="empty" style="padding:12px">Nessuna voce.</div>'}</div>
+    <div style="display:flex;gap:8px;margin-top:12px"><input id="newItem" placeholder="Nuova voce…" style="flex:1"><button class="btn" type="button" onclick="addListItem('${key}')">+ Aggiungi</button></div>`,null,{saveLabel:'Chiudi'});
+  const sv=document.getElementById('modalSave');if(sv)sv.onclick=()=>{closeModal();};
+}
+async function addListItem(key){const inp=document.getElementById('newItem');const v=(inp.value||'').trim();if(!v)return;const items=await getCustomList(key);if(items.some(x=>x.toLowerCase()===v.toLowerCase())){toast('Voce già presente');return;}items.push(v);await store.saveSettings({[key]:JSON.stringify(items)});manageList(key);}
+async function removeListItem(key,ix){const items=await getCustomList(key);if(!confirm('Rimuovere "'+items[ix]+'"?'))return;items.splice(ix,1);await store.saveSettings({[key]:JSON.stringify(items)});manageList(key);}
+async function managePains(){
+  const pains=await getPains();
+  const listHtml=pains.map((p,ix)=>`<div class="urow" style="padding:8px 12px"><div class="uinfo"><b>${esc(p)}</b></div><button class="del-btn" onclick="removePain(${ix})">Rimuovi</button></div>`).join('');
+  openModal('Esigenze / pain point',`<div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Aggiungi o rimuovi le esigenze proposte nel form dei lead.</div>
+    <div class="userlist" id="painList">${listHtml||'<div class="empty" style="padding:12px">Nessuna esigenza.</div>'}</div>
+    <div style="display:flex;gap:8px;margin-top:12px"><input id="newPain" placeholder="Nuova esigenza…" style="flex:1"><button class="btn" type="button" onclick="addPain()">+ Aggiungi</button></div>`,null,{saveLabel:'Chiudi'});
+  const sv=document.getElementById('modalSave');if(sv)sv.onclick=()=>{closeModal();render();};
+}
+async function addPain(){const inp=document.getElementById('newPain');const v=(inp.value||'').trim();if(!v)return;const pains=await getPains();if(pains.some(x=>x.toLowerCase()===v.toLowerCase())){toast('Esigenza già presente');return;}pains.push(v);await store.saveSettings({pain_points:JSON.stringify(pains)});managePains();}
+async function removePain(ix){const pains=await getPains();if(!confirm('Rimuovere "'+pains[ix]+'"?'))return;pains.splice(ix,1);await store.saveSettings({pain_points:JSON.stringify(pains)});managePains();}
 async function manageDocCategories(){
   const cats=await getDocCategories();
   const listHtml=cats.map((cat,ix)=>`<div class="urow" style="padding:8px 12px"><div class="uinfo"><b>${esc(cat)}</b></div><button class="del-btn" onclick="removeDocCategory(${ix})">Rimuovi</button></div>`).join('');
@@ -942,6 +970,13 @@ VIEWS.settings=async(c)=>{
    <div class="card"><div class="hd"><h3>Collaboratori & accessi</h3><div class="spacer"></div>${isSuper()?'<button class="btn sm" onclick="editUser()">+ Utente</button>':''}</div>
    <div class="bd" style="padding:0">${isSuper()?`<div class="userlist">${users.map(u=>`<div class="urow" onclick="editUser('${u.id}')"><div class="uinfo"><b>${esc(u.full_name)}</b><span>${esc(u.email)}</span></div><div class="utags">${u.is_superadmin?'<span class="pill r">Superadmin</span>':`<span class="pill n">${esc(u.role)}</span>`}<span style="font-size:11px;color:var(--muted)">${u.is_superadmin?'tutti i moduli':(u.modules||[]).length+' moduli'}</span>${u.twofa?'<span class="pill g">2FA attiva</span>':'<span class="pill r">2FA non attiva</span>'}</div><button class="del-btn" onclick="event.stopPropagation();delUser('${u.id}')">Elimina</button></div>`).join('')}</div>`:'<div class="empty">Solo un superadmin può gestire gli utenti.</div>'}</div></div>
   </div>
+  <div class="card" style="margin-top:18px"><div class="hd"><h3>Liste personalizzabili</h3></div><div class="bd" style="padding:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn ghost sm" onclick="manageList('activity_types')">Tipo attività</button>
+    <button class="btn ghost sm" onclick="manageList('interests')">Interessato a</button>
+    <button class="btn ghost sm" onclick="managePains()">Esigenze (lead)</button>
+    <button class="btn ghost sm" onclick="manageDocCategories()">Categorie documenti</button>
+    <span style="color:var(--muted);font-size:12.5px">Le voci sono condivise con tutto il team.</span>
+  </div></div>
   <div class="card" style="margin-top:18px"><div class="hd"><h3>Dati & backup</h3></div><div class="bd" style="padding:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <button class="btn ghost sm" onclick="exportData()">⭳ Esporta tutto (JSON)</button>
     ${MODE==='demo'?'<button class="btn ghost sm" onclick="resetDemo()">↺ Ripristina dati demo</button>':''}
@@ -1031,7 +1066,7 @@ async function zefixPick(i){
   }
 }
 let ZFX_PENDING_SIG=null;
-function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
+function companyFieldsHtml(co,lists){const ctypes=co.types||[];return `<div class="fgrid"><div class="sec-title">Anagrafica</div>
     <div class="field"><label>Ragione sociale *</label><div style="position:relative"><input id="co_name" value="${esc(co.name||'')}" autocomplete="off" oninput="zefixSearch()" placeholder="Inizia a digitare (ricerca su Zefix)…"><div id="zefixBox" class="zefix-box"></div></div></div>${f('P.IVA / N. IVA','co_vat',co.vat_number)}
     <div class="field full"><label>Tipo</label><div class="checks" style="grid-template-columns:repeat(3,1fr)">${ENUM.companyTypes.map(t=>`<label class="${ctypes.includes(t)?'on':''}"><input type="checkbox" class="cotype" value="${t}" ${ctypes.includes(t)?'checked':''} onchange="this.parentElement.classList.toggle('on',this.checked)">${t}</label>`).join('')}</div></div>
     ${f('Indirizzo','co_addr',co.address)}<div class="field"><label>CAP / NPA</label><input id="co_zip" value="${esc(co.zip||'')}" onchange="chZipToCity()"></div>
@@ -1041,13 +1076,13 @@ function companyFieldsHtml(co){const ctypes=co.types||[];return `<div class="fgr
     ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
     ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
-    <div class="sec-title">Infrastruttura IT attuale</div>
-    ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
-    ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
+    <div class="sec-title">Informazioni</div>
+    ${f('Tipo attività','co_acttype',co.activity_type,'select',['',...((lists&&lists.activity)||[])])}${f('Interessato a','co_interest',co.interest,'select',['',...((lists&&lists.interest)||[])])}
     ${f('Note','co_notes',co.notes,'textarea')}</div>`;}
-function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),phone:gv('co_phone'),email:gv('co_email'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),erp:gv('co_erp'),crm:gv('co_crm'),cloud:gv('co_cloud'),security:gv('co_sec'),connectivity:gv('co_conn'),datacenter:gv('co_dc'),backup:gv('co_bk'),ai:gv('co_ai'),notes:gv('co_notes')};}
+function readCompanyForm(){return {name:gv('co_name'),vat_number:gv('co_vat'),types:[...document.querySelectorAll('.cotype:checked')].map(x=>x.value),sector:gv('co_sector'),address:gv('co_addr'),zip:gv('co_zip'),city:gv('co_city'),country:gv('co_country'),phone:gv('co_phone'),email:gv('co_email'),employees:gv('co_emp'),revenue:gv('co_rev'),group_name:gv('co_grp'),international:gv('co_int'),num_sites:gv('co_sites'),activity_type:gv('co_acttype'),interest:gv('co_interest'),notes:gv('co_notes')};}
 async function editCompany(id){const co=id?await store.get('companies',id):{};
   const ctypes=co.types||[];
+  const COMPLISTS={activity:await getCustomList('activity_types'),interest:await getCustomList('interests')};
   let related='';
   if(id){const s=await store.settings();CUR=s.currency||CUR;
     const [quotes,sorders,invoices,porders,contacts]=await Promise.all([store.list('quotes'),store.list('sales_orders'),store.list('invoices'),store.list('purchase_orders'),store.list('contacts')]);
@@ -1086,9 +1121,8 @@ async function editCompany(id){const co=id?await store.get('companies',id):{};
     ${f('Settore','co_sector',co.sector,'datalist',ENUM.companySectors)}${f('N. dipendenti','co_emp',co.employees,'number')}
     ${f('Fatturato','co_rev',co.revenue)}${f('Gruppo societario','co_grp',co.group_name)}
     ${f('Presenza internazionale','co_int',co.international||'No','select',['No','Sì'])}${f('N. sedi','co_sites',co.num_sites,'number')}
-    <div class="sec-title">Infrastruttura IT attuale</div>
-    ${f('ERP','co_erp',co.erp)}${f('CRM','co_crm',co.crm)}${f('Cloud provider','co_cloud',co.cloud)}${f('Cybersecurity','co_sec',co.security)}
-    ${f('Connettività','co_conn',co.connectivity)}${f('Data center','co_dc',co.datacenter)}${f('Backup','co_bk',co.backup)}${f('Soluzioni AI','co_ai',co.ai)}
+    <div class="sec-title">Informazioni</div>
+    ${f('Tipo attività','co_acttype',co.activity_type,'select',['',...COMPLISTS.activity])}${f('Interessato a','co_interest',co.interest,'select',['',...COMPLISTS.interest])}
     ${f('Note','co_notes',co.notes,'textarea')}</div>${related}`,async()=>{
     const o=readCompanyForm();
     if(!o.name)throw new Error('Ragione sociale obbligatoria');
@@ -1177,7 +1211,7 @@ async function editContact(id,presetCompany,afterSave){const p=id?await store.ge
 
 /* LEAD */
 async function editLead(id){const l=id?await store.get('leads',id):{stage:'Lead acquisito',canone:'Annuale'};
-  const users=await refOptions('app_users',r=>r.full_name);
+  const users=await refOptions('app_users',r=>r.full_name);const pains=await getPains();
   const conv=l.converted?`<div class="full callout" style="background:#e9f7ed;border-color:#bfe3c9;color:#1f7a3d">✓ Lead convertito in cliente${l.converted_company?' — azienda creata in anagrafica':''}.</div>`:'';
   openModal(id?'Modifica lead':'Nuovo lead',`<div class="fgrid">${conv}<div class="sec-title">Opportunità</div>
     ${f('Titolo opportunità *','ld_title',l.title)}${f('Azienda (nome) *','ld_coname',l.company_name)}
@@ -1187,7 +1221,7 @@ async function editLead(id){const l=id?await store.get('leads',id):{stage:'Lead 
     ${f('Email','ld_cemail',l.contact_email,'email')}${f('Telefono','ld_cphone',l.contact_phone)}
     <div class="sec-title">Provenienza</div>
     ${f('Canale','ld_src',l.source,'select',ENUM.sources)}${f('Nome partner / segnalatore','ld_srcdet',l.source_detail)}
-    ${f('Esigenza / pain point','ld_pain',l.pain,'select',ENUM.pains)}${f('Concorrente in gioco','ld_comp',l.competitor)}
+    ${f('Esigenza / pain point','ld_pain',l.pain,'select',pains)}${f('Concorrente in gioco','ld_comp',l.competitor)}
     <div class="sec-title">Qualifica BANT</div>
     ${f('Budget','ld_budget',l.budget,'select',['',...ENUM.budget])}${f('Authority (potere)','ld_auth',l.authority,'select',['',...ENUM.authority])}
     ${f('Timing acquisto','ld_timing',l.timing,'select',['',...ENUM.timing])}${f('Need / interesse confermato','ld_interest',l.interest,'check')}
@@ -1463,7 +1497,8 @@ async function saveDoc(mode){if(!DOC_EDIT)return;const {kind,id,cfg}=DOC_EDIT;co
 }
 async function newPartyCompany(isSupplier){
   const type=isSupplier?'Fornitore':'Cliente';
-  openModal2('Nuova azienda',companyFieldsHtml({types:[type]}),async()=>{
+  const lists={activity:await getCustomList('activity_types'),interest:await getCustomList('interests')};
+  openModal2('Nuova azienda',companyFieldsHtml({types:[type]},lists),async()=>{
     const o=readCompanyForm();if(!o.name)throw new Error('Ragione sociale obbligatoria');
     const co=await store.insert('companies',o);
     const sel=document.getElementById('dc_party');if(sel){const op=document.createElement('option');op.value=co.id;op.textContent=co.name;sel.appendChild(op);sel.value=co.id;}
