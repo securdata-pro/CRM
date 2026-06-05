@@ -484,7 +484,7 @@ function SupabaseStore(client){
 /* ===== helpers ===== */
 function uid(){return 'id'+Math.random().toString(36).slice(2,10)}
 function esc(s){return (s==null?'':''+s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-let CUR='CHF';
+let CUR='CHF';let DEF_CODE='GEN';
 function money(n){n=Number(n||0);return n.toLocaleString('it-CH',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+CUR}
 function moneyShort(n){n=Number(n||0);if(Math.abs(n)>=1000)return (n/1000).toLocaleString('it-CH',{maximumFractionDigits:1})+'k '+CUR;return Math.round(n)+' '+CUR}
 function fmt(n,cur){n=Number(n||0);return n.toLocaleString('it-CH',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(cur||CUR)}
@@ -963,6 +963,7 @@ VIEWS.settings=async(c)=>{
      <div class="field"><label>Sito web</label><input id="st_web" value="${esc(s.website)}"></div>
      <div class="field"><label>IVA predefinita (%)</label><input id="st_vat" type="number" step="0.1" value="${esc(s.default_vat)}"></div>
      <div class="field"><label>Valuta</label><select id="st_cur">${ENUM.currencies.map(o=>`<option ${o===s.currency?'selected':''}>${o}</option>`).join('')}</select></div>
+     <div class="field"><label>Codice riga predefinito (voci senza codice)</label><input id="st_defcode" value="${esc(s.default_code||'GEN')}" placeholder="GEN"></div>
      <div class="field"><label>Cambio: 1 EUR = … CHF</label><input id="st_reur" type="number" step="0.0001" value="${esc(s.rate_eur||0.95)}"></div>
      <div class="field"><label>Cambio: 1 USD = … CHF</label><input id="st_rusd" type="number" step="0.0001" value="${esc(s.rate_usd||0.88)}"></div>
      <div class="field full"><label>Email per richieste reset password</label><input id="st_reset" value="${esc(s.reset_email||s.email||'')}"><div style="font-size:11.5px;color:var(--muted);margin-top:4px">Le richieste “Password dimenticata” vengono inviate a questo indirizzo.</div></div>
@@ -983,7 +984,7 @@ VIEWS.settings=async(c)=>{
     ${MODE==='demo'?'<button class="btn ghost sm" onclick="resetDemo()">↺ Ripristina dati demo</button>':''}
     <span style="color:var(--muted);font-size:12.5px">Modalità: <b>${MODE==='demo'?'demo locale (browser)':'Supabase (cloud)'}</b></span>
   </div></div>`;};
-async function saveCompanyData(){await store.saveSettings({name:val('st_name'),address:val('st_address'),zip_city:val('st_zip'),country:val('st_country'),tax_id:val('st_tax'),phone:val('st_phone'),email:val('st_email'),website:val('st_web'),default_vat:parseFloat(val('st_vat'))||0,currency:val('st_cur'),reset_email:val('st_reset'),rate_eur:parseFloat(val('st_reur'))||0.95,rate_usd:parseFloat(val('st_rusd'))||0.88});CUR=val('st_cur')||'CHF';toast('Dati azienda salvati');}
+async function saveCompanyData(){await store.saveSettings({name:val('st_name'),address:val('st_address'),zip_city:val('st_zip'),country:val('st_country'),tax_id:val('st_tax'),phone:val('st_phone'),email:val('st_email'),website:val('st_web'),default_vat:parseFloat(val('st_vat'))||0,currency:val('st_cur'),reset_email:val('st_reset'),rate_eur:parseFloat(val('st_reur'))||0.95,rate_usd:parseFloat(val('st_rusd'))||0.88,default_code:val('st_defcode')||'GEN'});CUR=val('st_cur')||'CHF';DEF_CODE=val('st_defcode')||'GEN';toast('Dati azienda salvati');}
 function val(id){const e=document.getElementById(id);return e?e.value:''}
 
 /* ===== form engine ===== */
@@ -1477,7 +1478,7 @@ async function docForm(kind,id){
       </div>
     </div>
   </div>`;
-  CUR=doc.currency||s.currency||'CHF';
+  CUR=doc.currency||s.currency||'CHF';DEF_CODE=s.default_code||'GEN';
   let DOC_CUR=CUR;const RATES={CHF:1,EUR:Number(s.rate_eur)||0.95,USD:Number(s.rate_usd)||0.88};
   const curEl=document.getElementById('dc_cur');
   if(curEl)curEl.addEventListener('change',()=>{const oldC=DOC_CUR,newC=curEl.value;
@@ -1509,7 +1510,7 @@ async function newPartyCompany(isSupplier){
 function addLine(vat){LINE_BUF.push({code:'',desc:'',qty:1,price:0,vat:vat||0});renderLines();}
 async function addFromCatalog(pid){if(!pid)return;collectLines();const p=await store.get('products',pid);if(p){if(LINE_BUF.length===1&&!LINE_BUF[0].desc&&!LINE_BUF[0].price)LINE_BUF=[];LINE_BUF.push({code:p.code||'',desc:p.name||'',qty:1,price:Number(p.unit_price)||0,vat:Number(p.vat)||0});renderLines();}}
 function collectLines(){LINE_BUF=[...document.querySelectorAll('#lineRows tr')].map(tr=>({code:tr.querySelector('.ln-code').value,desc:tr.querySelector('.ln-desc').value,qty:parseFloat(tr.querySelector('.ln-qty').value)||0,price:parseFloat(tr.querySelector('.ln-price').value)||0,vat:parseFloat(tr.querySelector('.ln-vat').value)||0,disc:parseFloat(tr.querySelector('.ln-disc').value)||0}));}
-function renderLines(){const tb=document.getElementById('lineRows');if(!tb)return;tb.innerHTML=LINE_BUF.map((l,i)=>`<tr><td><input class="ln-code mono" list="dlCodes" value="${esc(l.code||'')}" onchange="lnPickCode(${i})" oninput="recalc()"></td><td><input class="ln-desc" list="dlNames" value="${esc(l.desc)}" onchange="lnPickName(${i})" oninput="recalc()"></td><td class="num"><input class="ln-qty num" type="number" step="any" value="${l.qty}" oninput="recalc()"></td><td class="num"><input class="ln-price num" type="number" step="any" value="${l.price}" oninput="recalc()"></td><td class="num"><input class="ln-vat num" type="number" step="0.1" list="vatPresets" value="${l.vat}" oninput="recalc()"></td><td class="num"><input class="ln-disc num" type="number" step="any" value="${l.disc||0}" oninput="recalc()"></td><td class="num" id="ln-amt-${i}">0</td><td><div class="rowact"><button class="iconbtn" title="Salva a catalogo" onclick="lnAddCatalog(${i})">💾</button><button class="iconbtn" title="Rimuovi riga" onclick="removeLine(${i})">×</button></div></td></tr>`).join('');recalc();}
+function renderLines(){const tb=document.getElementById('lineRows');if(!tb)return;tb.innerHTML=LINE_BUF.map((l,i)=>`<tr><td><input class="ln-code mono" list="dlCodes" placeholder="${esc(DEF_CODE||'')}" value="${esc(l.code||'')}" onchange="lnPickCode(${i})" oninput="recalc()"></td><td><input class="ln-desc" list="dlNames" value="${esc(l.desc)}" onchange="lnPickName(${i})" oninput="recalc()"></td><td class="num"><input class="ln-qty num" type="number" step="any" value="${l.qty}" oninput="recalc()"></td><td class="num"><input class="ln-price num" type="number" step="any" value="${l.price}" oninput="recalc()"></td><td class="num"><input class="ln-vat num" type="number" step="0.1" list="vatPresets" value="${l.vat}" oninput="recalc()"></td><td class="num"><input class="ln-disc num" type="number" step="any" value="${l.disc||0}" oninput="recalc()"></td><td class="num" id="ln-amt-${i}">0</td><td><div class="rowact"><button class="iconbtn" title="Salva a catalogo" onclick="lnAddCatalog(${i})">💾</button><button class="iconbtn" title="Rimuovi riga" onclick="removeLine(${i})">×</button></div></td></tr>`).join('');recalc();}
 function lnRow(i){return document.querySelectorAll('#lineRows tr')[i];}
 function lnPickCode(i){const tr=lnRow(i);if(!tr)return;const code=tr.querySelector('.ln-code').value.trim();const p=DOC_PRODS.find(x=>(x.code||'').toLowerCase()===code.toLowerCase());if(p){tr.querySelector('.ln-desc').value=p.name||'';tr.querySelector('.ln-price').value=Number(p.unit_price)||0;tr.querySelector('.ln-vat').value=Number(p.vat)||0;recalc();}}
 function lnPickName(i){const tr=lnRow(i);if(!tr)return;const nm=tr.querySelector('.ln-desc').value.trim();const p=DOC_PRODS.find(x=>(x.name||'').toLowerCase()===nm.toLowerCase());if(p){if(p.code)tr.querySelector('.ln-code').value=p.code;tr.querySelector('.ln-price').value=Number(p.unit_price)||0;tr.querySelector('.ln-vat').value=Number(p.vat)||0;recalc();}}
@@ -1528,7 +1529,7 @@ async function convertToInvoice(srcId,srcKind='quote'){const scfg=DOC_CFG[srcKin
   const inv={number:await nextNumber('invoice'),company:q.company,contact:q.contact,commercial_ref:q.commercial_ref,date:todayISO(),expiry:addDays(todayISO(),30),currency:q.currency,status:'Bozza',payment_terms:q.payment_terms,notes:q.notes,lines:JSON.parse(JSON.stringify(q.lines||[])),quote_id:q.id,documents:q.documents||[]};
   await store.insert('invoices',inv);try{await store.update(scfg.table,srcId,{status:'Accettato'});}catch(e){}toast('Fattura '+inv.number+' creata');go('invoices');}
 async function duplicateDoc(table,id,kind){const d=await store.get(table,id);if(!d)return;const copy=JSON.parse(JSON.stringify(d));delete copy.id;delete copy.created_at;copy.number=await nextNumber(kind);copy.date=todayISO();copy.status=DOC_CFG[kind].statuses[0];await store.insert(table,copy);toast('Duplicato come '+copy.number);render();}
-async function sendDoc(kind,id){const cfg=DOC_CFG[kind];const doc=await store.get(cfg.table,id);const s=await store.settings();CUR=doc.currency||s.currency||'CHF';
+async function sendDoc(kind,id){const cfg=DOC_CFG[kind];const doc=await store.get(cfg.table,id);const s=await store.settings();CUR=doc.currency||s.currency||'CHF';DEF_CODE=s.default_code||'GEN';
   const companies=await store.list('companies');const contacts=await store.list('contacts');const co=companies.find(x=>x.id===doc.company)||{};const ct=contacts.find(x=>x.id===doc.contact);
   const to=(ct&&ct.email)||co.email||'';const t=docTotals(doc);
   const subject=`${cfg.label.charAt(0).toUpperCase()+cfg.label.slice(1)} ${doc.number} — ${s.name}`;
@@ -1542,7 +1543,7 @@ async function sendDoc(kind,id){const cfg=DOC_CFG[kind];const doc=await store.ge
   {saveLabel:'Apri client email',extra:`<button class="btn ghost" onclick="printDoc('${kind}','${id}')">⭳ Scarica PDF</button>`});}
 
 /* ===== PRINT ===== */
-async function getDocCtx(kind,id){const cfg=DOC_CFG[kind];const doc=await store.get(cfg.table,id);const s=await store.settings();CUR=doc.currency||s.currency||'CHF';
+async function getDocCtx(kind,id){const cfg=DOC_CFG[kind];const doc=await store.get(cfg.table,id);const s=await store.settings();CUR=doc.currency||s.currency||'CHF';DEF_CODE=s.default_code||'GEN';
   const companies=await store.list('companies');const contacts=await store.list('contacts');const allDocs=await store.list('documents');const banks=await store.list('banks');
   let party,ct=null;if(cfg.supplier){party=companies.find(x=>x.id===doc.supplier)||{};}else{party=companies.find(x=>x.id===doc.company)||{};ct=contacts.find(x=>x.id===doc.contact);}
   const bank=doc.bank_id?banks.find(b=>b.id===doc.bank_id):null;
@@ -1567,7 +1568,7 @@ function docPartyMetaHtml(ctx){const {cfg,doc,party,ct}=ctx;return `<div style="
        ${doc.subject?`<div style="flex:0 0 100%;margin-top:4px"><div class="lb">OGGETTO:</div><div class="vv" style="white-space:normal">${esc(doc.subject)}</div></div>`:''}
      </div>`;}
 function docTableHead(showDisc){return `<thead><tr><th style="text-align:left;width:74px">Codice</th><th style="text-align:left">Descrizione</th><th class="amt" style="width:42px">Q.tà</th><th class="amt" style="width:90px">Prezzo unit.</th>${showDisc?'<th class="amt" style="width:42px">SC.</th>':''}<th class="amt" style="width:48px">IVA</th><th class="amt" style="width:92px">Importo</th></tr></thead>`;}
-function docRowHtml(l,showDisc){const amt=(l.qty||0)*(l.price||0)*(1-((l.disc||0)/100));return `<tr><td class="mono" style="font-size:11px;white-space:nowrap">${esc(l.code||'—')}</td><td class="desc">${esc(l.desc)}</td><td class="amt mono">${l.qty}</td><td class="amt mono">${pmoney(l.price)}</td>${showDisc?`<td class="amt mono">${(l.disc||0)?(l.disc+'%'):'—'}</td>`:''}<td class="amt mono">${l.vat}%</td><td class="amt mono">${pmoney(amt)}</td></tr>`;}
+function docRowHtml(l,showDisc){const amt=(l.qty||0)*(l.price||0)*(1-((l.disc||0)/100));return `<tr><td class="mono" style="font-size:11px;white-space:nowrap">${esc(l.code||DEF_CODE||'—')}</td><td class="desc">${esc(l.desc)}</td><td class="amt mono">${l.qty}</td><td class="amt mono">${pmoney(l.price)}</td>${showDisc?`<td class="amt mono">${(l.disc||0)?(l.disc+'%'):'—'}</td>`:''}<td class="amt mono">${l.vat}%</td><td class="amt mono">${pmoney(amt)}</td></tr>`;}
 function docTotalsHtml(t){return `<div class="dtot"><div class="r"><span>Imponibile</span><span class="mono">${pmoney(t.net)}</span></div><div class="r"><span>IVA</span><span class="mono">${pmoney(t.tax)}</span></div><div class="r big"><span>Totale</span><span class="mono">${pmoney(t.total)}</span></div></div>`;}
 function docNotesHtml(ctx){const {doc,bank,s,attachNames}=ctx;return `<div class="notes"><div class="lb">Termini di pagamento</div><div>${esc(doc.payment_terms||'—')}</div>${bank?`<div class="lb" style="margin-top:12px">Coordinate bancarie</div><div>${esc(bank.holder||s.name)}<br>${esc(bank.bank||'')}<br>IBAN: ${esc(bank.iban||'')}${bank.swift?'<br>Codice SWIFT: '+esc(bank.swift):''}</div>`:''}${doc.notes?`<div class="lb" style="margin-top:12px">Note</div><div style="white-space:pre-line">${esc(doc.notes)}</div>`:''}${attachNames.length?`<div class="lb" style="margin-top:12px">Allegati</div><div>${attachNames.map(esc).join(', ')}</div>`:''}</div>`;}
 function docFootLine(s){return `${esc(s.name)} · ${esc(s.address)} · ${esc(s.zip_city)} · ${esc(s.tax_id)}`;}
@@ -1772,7 +1773,7 @@ async function verify2FA(){const u=PENDING_2FA;if(!u)return;const code=document.
   if(await totpVerify(u.totp_secret,code)){CURRENT_USER=u;await logAccess(u.email,true,'');LS.set('securgest_user',u.email);await boot();}
   else{await logAccess(u.email,false,'Codice 2FA errato');err.textContent='Codice non valido.';err.style.display='block';}}
 function cancel2FA(){PENDING_2FA=null;document.getElementById('twofaBox').style.display='none';document.getElementById('loginMain').style.display='block';}
-async function boot(){const s=await store.settings();CUR=(s&&s.currency)||'CHF';
+async function boot(){const s=await store.settings();CUR=(s&&s.currency)||'CHF';DEF_CODE=(s&&s.default_code)||'GEN';
   document.getElementById('gate').style.display='none';document.getElementById('login').style.display='none';document.getElementById('app').style.display='block';
   const badge=document.getElementById('modeBadge');badge.textContent=MODE==='demo'?'demo locale':'Supabase · cloud';badge.className='badge'+(MODE==='supabase'?' live':'');
   document.getElementById('whoName').textContent=CURRENT_USER.full_name;document.getElementById('whoRole').textContent=CURRENT_USER.is_superadmin?'Superadmin':CURRENT_USER.role;
