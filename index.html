@@ -453,7 +453,7 @@ function DemoStore(){
       ]
     };
   }
-  const cols=['settings','app_users','companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','expenses','documents','banks','access_logs','campaigns'];
+  const cols=['settings','app_users','companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','expenses','documents','banks','bank_movements','access_logs','campaigns'];
   const norm=t=>cols.includes(t)?t:null;
   return {
     mode:'demo',
@@ -905,19 +905,66 @@ async function removeDocCategory(ix){
 }
 
 /* ===== BANKS ===== */
-VIEWS.banks=async(c)=>{const banks=await store.list('banks');
-  c.innerHTML=`<div class="callout">I conti qui inseriti possono essere selezionati nei preventivi e nelle fatture: le coordinate compaiono nelle condizioni di pagamento e nella QR-fattura svizzera.</div>
-  <div class="toolbar">${searchBox('Cerca conto, IBAN…','sBank')}<span style="color:var(--muted);font-size:12.5px">${banks.length} conti</span></div>
-  <div class="card"><table><thead><tr><th>Conto</th><th>Banca</th><th>IBAN</th><th>SWIFT/BIC</th><th>Valuta</th><th></th></tr></thead><tbody>${
-  banks.map(b=>`<tr data-s="${esc((b.label+' '+b.bank+' '+b.iban).toLowerCase())}" onclick="editBank('${b.id}')"><td><b>${esc(b.label)}</b>${b.is_default?' <span class="pill g">predefinito</span>':''}<br><span style="color:var(--muted);font-size:12px">${esc(b.holder||'')}</span></td><td>${esc(b.bank||'—')}</td><td class="mono" style="font-size:12.5px">${esc(b.iban||'—')}</td><td class="mono" style="font-size:12.5px">${esc(b.swift||'—')}</td><td>${esc(b.currency||'—')}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('banks','${b.id}')">🗑</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nessun conto bancario.</td></tr>'}</tbody></table></div>`;};
+VIEWS.banks=async(c)=>{const [banks,movs,invoices,expenses]=await Promise.all([store.list('banks'),store.list('bank_movements'),store.list('invoices'),store.list('expenses')]);
+  const invMap=Object.fromEntries(invoices.map(x=>[x.id,x]));const expMap=Object.fromEntries(expenses.map(x=>[x.id,x]));const bankMap=Object.fromEntries(banks.map(x=>[x.id,x]));
+  const ml=movs.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const matchedTxt=m=>{if(!m.matched)return '<span style="color:var(--muted)">—</span>';if(m.matched_kind==='invoice'){const d=invMap[m.matched_id];return d?('<span class="pill g">Fattura '+esc(d.number)+'</span>'):'fattura';}if(m.matched_kind==='expense'){const d=expMap[m.matched_id];return d?('<span class="pill g">Acquisto '+esc(d.number)+'</span>'):'acquisto';}return '—';};
+  c.innerHTML=`<div class="callout">I conti qui inseriti compaiono nelle condizioni di pagamento e nella QR-fattura. Importa l'estratto conto <b>CAMT.053</b> dall'e-banking per aggiornare il saldo, registrare i movimenti e conciliare automaticamente le fatture.</div>
+  <div class="toolbar">${searchBox('Cerca conto, IBAN…','sBank')}<span style="color:var(--muted);font-size:12.5px">${banks.length} conti</span><div class="spacer"></div><button class="btn ghost" onclick="importCamt()">📥 Importa estratto (CAMT.053)</button><button class="btn sm" onclick="editBank()">+ Nuovo conto</button></div>
+  <div class="card"><table><thead><tr><th>Conto</th><th>Banca</th><th>IBAN</th><th class="num">Saldo</th><th>Valuta</th><th></th></tr></thead><tbody>${
+  banks.map(b=>`<tr data-s="${esc((b.label+' '+b.bank+' '+b.iban).toLowerCase())}" onclick="editBank('${b.id}')"><td><b>${esc(b.label)}</b>${b.is_default?' <span class="pill g">predefinito</span>':''}<br><span style="color:var(--muted);font-size:12px">${esc(b.holder||'')}</span></td><td>${esc(b.bank||'—')}</td><td class="mono" style="font-size:12.5px">${esc(b.iban||'—')}</td><td class="num mono">${b.balance!=null?moneyc(b.balance,b.currency):'—'}${b.balance_date?`<br><span style="color:var(--muted);font-size:11px">al ${dateIt(b.balance_date)}</span>`:''}</td><td>${esc(b.currency||'—')}</td><td class="rowact"><button class="iconbtn" onclick="event.stopPropagation();delRow('banks','${b.id}')">🗑</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nessun conto bancario.</td></tr>'}</tbody></table></div>
+  <h3 style="margin:22px 0 8px;font-size:15px">Movimenti <span style="color:var(--muted);font-weight:400">(${ml.length})</span></h3>
+  <div class="card"><table><thead><tr><th>Data</th><th>Conto</th><th>Descrizione</th><th class="num">Importo</th><th>Documento</th><th></th></tr></thead><tbody>${
+  ml.map(m=>{const pos=(m.amount||0)>=0;return `<tr data-s="${esc(((m.description||'')+' '+(m.reference||'')).toLowerCase())}"><td style="white-space:nowrap">${dateIt(m.date)}</td><td style="font-size:12px">${esc((bankMap[m.bank_id]||{}).label||'—')}</td><td style="font-size:12px;max-width:340px">${esc(m.description||'')}${m.reference?`<br><span style="color:var(--muted);font-size:11px">Rif: ${esc(m.reference)}</span>`:''}</td><td class="num mono" style="color:${pos?'#1a7f4b':'#b3261e'};white-space:nowrap">${moneyc(m.amount,m.currency)}</td><td style="font-size:12px">${matchedTxt(m)}</td><td class="rowact">${m.matched?`<button class="iconbtn" title="Scollega" onclick="unlinkMovement('${m.id}')">✖</button>`:`<button class="iconbtn" title="Abbina a documento" onclick="matchMovement('${m.id}')">🔗</button>`}<button class="iconbtn" onclick="delRow('bank_movements','${m.id}')">🗑</button></td></tr>`;}).join('')||'<tr><td colspan="6" class="empty">Nessun movimento. Usa "Importa estratto (CAMT.053)".</td></tr>'}</tbody></table></div>`;};
+
+function camtTxt(node,name){const e=node&&node.getElementsByTagNameNS('*',name)[0];return e?e.textContent.trim():'';}
+function camtAll(node,name){return node?[...node.getElementsByTagNameNS('*',name)]:[];}
+function parseCamt053(xml){const doc=new DOMParser().parseFromString(xml,'text/xml');if(doc.getElementsByTagName('parsererror').length)throw new Error('XML non valido');
+  const stmts=camtAll(doc,'Stmt');if(!stmts.length)throw new Error('Nessun estratto (Stmt): è un file CAMT.053?');const res=[];
+  for(const stmt of stmts){const acct=camtAll(stmt,'Acct')[0];const iban=acct?(camtTxt(acct,'IBAN')||camtTxt(acct,'Id')):'';let ccy=camtTxt(acct,'Ccy')||'';
+    let balance=null,balanceDate='';
+    for(const bal of camtAll(stmt,'Bal')){const cd=camtTxt(bal,'Cd');if(cd==='CLBD'||cd==='CLAV'){const amtEl=camtAll(bal,'Amt')[0];const amt=parseFloat(amtEl?amtEl.textContent:'0')||0;const ind=camtTxt(bal,'CdtDbtInd');balance=ind==='DBIT'?-amt:amt;const d=camtAll(bal,'Dt')[0];balanceDate=(d?(camtTxt(d,'Dt')||camtTxt(d,'DtTm')):'').slice(0,10);if(!ccy&&amtEl)ccy=amtEl.getAttribute('Ccy')||'';}}
+    const movements=[];
+    for(const ntry of camtAll(stmt,'Ntry')){const amtEl=camtAll(ntry,'Amt')[0];const amt=parseFloat(amtEl?amtEl.textContent:'0')||0;const ind=camtTxt(ntry,'CdtDbtInd');const signed=Math.round((ind==='DBIT'?-amt:amt)*100)/100;const ecur=(amtEl&&amtEl.getAttribute('Ccy'))||ccy||'CHF';
+      const bd=camtAll(ntry,'BookgDt')[0];const date=(bd?(camtTxt(bd,'Dt')||camtTxt(bd,'DtTm')):'').slice(0,10);const vd=camtAll(ntry,'ValDt')[0];const vdate=(vd?(camtTxt(vd,'Dt')||camtTxt(vd,'DtTm')):'').slice(0,10);
+      const txd=camtAll(ntry,'TxDtls')[0]||ntry;const ustrd=camtAll(txd,'Ustrd').map(x=>x.textContent.trim()).join(' ');const ref=camtTxt(txd,'Ref')||camtTxt(txd,'EndToEndId')||'';
+      let party='';const rp=camtAll(txd,'RltdPties')[0];if(rp){const side=camtAll(rp,ind==='DBIT'?'Cdtr':'Dbtr')[0];party=side?camtTxt(side,'Nm'):'';if(!party){const nm=camtAll(rp,'Nm')[0];party=nm?nm.textContent.trim():'';}}
+      const addtl=camtTxt(ntry,'AddtlNtryInf');const description=[party,ustrd||addtl].filter(Boolean).join(' — ')||addtl||'(movimento)';
+      movements.push({date:date||vdate,value_date:vdate,amount:signed,currency:ecur,description,counterparty:party,reference:ref});}
+    res.push({iban,balance,balance_date:balanceDate,currency:ccy||'CHF',movements});}
+  return res;}
+function importCamt(){const inp=document.createElement('input');inp.type='file';inp.accept='.xml,text/xml,application/xml';inp.onchange=async()=>{const file=inp.files[0];if(!file)return;try{toast('Lettura estratto…');const text=await file.text();await processCamt(text);}catch(err){alert('Errore import: '+err.message);}};inp.click();}
+async function processCamt(text){const stmts=parseCamt053(text);const banks=await store.list('banks');let totMov=0,totRec=0;const info=[];
+  for(const st of stmts){const ibanN=(st.iban||'').replace(/\s/g,'').toUpperCase();const bank=banks.find(b=>(b.iban||'').replace(/\s/g,'').toUpperCase()===ibanN);
+    if(!bank){info.push('IBAN '+(st.iban||'?')+': nessun conto corrispondente — crea prima il conto in Banche.');continue;}
+    if(st.balance!=null)await store.update('banks',bank.id,{balance:st.balance,balance_date:st.balance_date||null});
+    const existing=(await store.list('bank_movements')).filter(m=>m.bank_id===bank.id);const sig=m=>[m.date,m.amount,(m.reference||''),(m.description||'').slice(0,40)].join('|');const seen=new Set(existing.map(sig));
+    const toInsert=st.movements.filter(m=>!seen.has(sig(m)));
+    for(const m of toInsert){await store.insert('bank_movements',{bank_id:bank.id,date:m.date||null,value_date:m.value_date||null,amount:m.amount,currency:m.currency,description:m.description,counterparty:m.counterparty,reference:m.reference,matched:false,matched_kind:null,matched_id:null});}
+    totMov+=toInsert.length;const rec=await reconcileBank(bank.id);totRec+=rec;
+    info.push(bank.label+': +'+toInsert.length+' movimenti'+(st.balance!=null?(', saldo '+moneyc(st.balance,bank.currency)):'')+(rec?(', '+rec+' fatture conciliate'):''));}
+  toast('Import completato');alert('Estratto importato.\n\n'+info.join('\n')+'\n\nTotale: '+totMov+' nuovi movimenti, '+totRec+' fatture conciliate.');render();}
+async function reconcileBank(bankId){const movs=(await store.list('bank_movements')).filter(m=>m.bank_id===bankId&&!m.matched);const invoices=await store.list('invoices');const expenses=await store.list('expenses');let n=0;
+  for(const m of movs){const amt=Math.round(Math.abs(m.amount)*100)/100;const hay=((m.reference||'')+' '+(m.description||'')+' '+(m.counterparty||'')).toLowerCase();
+    if(m.amount>0){const cand=invoices.filter(q=>q.status!=='Pagata'&&q.status!=='Annullata'&&Math.round(docTotals(q).total*100)/100===amt);const pick=cand.find(q=>q.number&&hay.includes(q.number.toLowerCase()))||(cand.length===1?cand[0]:null);
+      if(pick){await store.update('invoices',pick.id,{status:'Pagata'});await store.update('bank_movements',m.id,{matched:true,matched_kind:'invoice',matched_id:pick.id});const o=invoices.find(x=>x.id===pick.id);if(o)o.status='Pagata';n++;}}
+    else if(m.amount<0){const cand=expenses.filter(e=>e.status!=='Pagata'&&Math.round((e.total||0)*100)/100===amt);const pick=cand.find(e=>e.number&&hay.includes(e.number.toLowerCase()))||(cand.length===1?cand[0]:null);
+      if(pick){await store.update('expenses',pick.id,{status:'Pagata'});await store.update('bank_movements',m.id,{matched:true,matched_kind:'expense',matched_id:pick.id});const o=expenses.find(x=>x.id===pick.id);if(o)o.status='Pagata';n++;}}}
+  return n;}
+async function matchMovement(id){const m=await store.get('bank_movements',id);if(!m)return;const amt=Math.round(Math.abs(m.amount)*100)/100;let kind,opts;
+  if(m.amount>=0){kind='invoice';const inv=(await store.list('invoices')).filter(q=>q.status!=='Annullata');inv.sort((a,b)=>{const ma=Math.round(docTotals(a).total*100)/100===amt?0:1,mb=Math.round(docTotals(b).total*100)/100===amt?0:1;return ma-mb||(b.date||'').localeCompare(a.date||'');});opts=inv.map(q=>`<option value="${q.id}">${esc(q.number)} · ${moneyc(docTotals(q).total,q.currency)} · ${esc(q.status||'')}</option>`).join('');}
+  else{kind='expense';const exp=(await store.list('expenses')).slice();exp.sort((a,b)=>{const ma=Math.round((a.total||0)*100)/100===amt?0:1,mb=Math.round((b.total||0)*100)/100===amt?0:1;return ma-mb||(b.date||'').localeCompare(a.date||'');});opts=exp.map(e=>`<option value="${e.id}">${esc(e.number)} · ${moneyc(e.total,e.currency)} · ${esc(e.status||'')}</option>`).join('');}
+  openModal('Abbina movimento','<div class="field"><label>'+(kind==='invoice'?'Fattura emessa':'Fattura fornitore')+' — movimento '+moneyc(m.amount,m.currency)+'</label><select id="mm_doc">'+opts+'</select></div><div style="font-size:12px;color:var(--muted);margin-top:8px">Il documento selezionato verrà segnato come "Pagata".</div>',async()=>{const did=val('mm_doc');if(!did)return;await store.update(kind==='invoice'?'invoices':'expenses',did,{status:'Pagata'});await store.update('bank_movements',id,{matched:true,matched_kind:kind,matched_id:did});},{saveLabel:'Abbina'});}
+async function unlinkMovement(id){await store.update('bank_movements',id,{matched:false,matched_kind:null,matched_id:null});render();}
 async function editBank(id){const b=id?await store.get('banks',id):{currency:'CHF',holder:(await store.settings()).name};
   openModal(id?'Modifica conto':'Nuovo conto bancario',`<div class="fgrid">
     ${f('Etichetta conto *','bk_label',b.label)}${f('Intestatario','bk_holder',b.holder)}
     ${f('Banca','bk_bank',b.bank)}${f('Valuta','bk_cur',b.currency||'CHF','select',ENUM.currencies)}
     ${f('IBAN','bk_iban',b.iban)}${f('SWIFT / BIC','bk_swift',b.swift)}
     ${f('Conto predefinito','bk_def',b.is_default,'check')}<div></div>
+    ${f('Saldo','bk_balance',b.balance,'number')}<div></div>
     ${f('Note','bk_notes',b.notes,'textarea')}</div>`,async()=>{
-    const o={label:gv('bk_label'),holder:gv('bk_holder'),bank:gv('bk_bank'),currency:gv('bk_cur'),iban:gv('bk_iban'),swift:gv('bk_swift'),is_default:gv('bk_def'),notes:gv('bk_notes')};
+    const o={label:gv('bk_label'),holder:gv('bk_holder'),bank:gv('bk_bank'),currency:gv('bk_cur'),iban:gv('bk_iban'),swift:gv('bk_swift'),is_default:gv('bk_def'),notes:gv('bk_notes'),balance:(gv('bk_balance')===''||gv('bk_balance')==null)?null:(parseFloat(gv('bk_balance'))||0)};
     if(!o.label)throw new Error('Etichetta obbligatoria');
     if(o.is_default){const all=await store.list('banks');for(const x of all)if(x.is_default&&x.id!==id)await store.update('banks',x.id,{is_default:false});}
     id?await store.update('banks',id,o):await store.insert('banks',o);});}
@@ -1983,7 +2030,7 @@ async function boot(){const s=await store.settings();CUR=(s&&s.currency)||'CHF';
 function twofaReminder(){document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onmousedown="this._mdbg=event.target===this" onclick="if(this._mdbg&&event.target===this)closeModal()"><div class="modal" style="max-width:470px"><div class="mhd"><h3>🔒 Proteggi il tuo account</h3><button onclick="closeModal()">×</button></div><div class="mbd"><p style="margin:0 0 10px">Per maggiore sicurezza ti consigliamo di attivare la <b>verifica in due passaggi (2FA)</b>.</p><div class="callout">Finché non la attivi, questo avviso comparirà a ogni accesso. Bastano pochi secondi con un'app come Google Authenticator o Microsoft Authenticator.</div></div><div class="mft"><button class="btn ghost" onclick="closeModal()">Più tardi</button><button class="btn red" onclick="closeModal();security2FA()">Attiva ora</button></div></div></div>`;}
 async function logout(){try{if(MODE==='supabase'&&SB)await SB.auth.signOut();}catch(e){}LS.del('securgest_mode');LS.del('securgest_user');location.reload();}
 async function resetDemo(){if(!confirm('Ripristinare i dati demo iniziali?'))return;await store.reset();render();toast('Dati demo ripristinati');}
-async function exportData(){const tables=['companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','expenses','documents','banks','app_users'];const out={settings:await store.settings()};for(const t of tables)out[t]=await store.list(t);const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='securgest-export.json';a.click();}
+async function exportData(){const tables=['companies','contacts','leads','products','licenses','quotes','invoices','sales_orders','purchase_orders','proformas','expenses','documents','banks','bank_movements','app_users'];const out={settings:await store.settings()};for(const t of tables)out[t]=await store.list(t);const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='securgest-export.json';a.click();}
 
 /* ===== IMPORT AZIENDE da Excel/CSV ===== */
 let IMP_CO=[];
