@@ -1369,7 +1369,7 @@ async function editContact(id,presetCompany,afterSave){const p=id?await store.ge
     ${phoneField('Mobile','ct_mobile',p.mobile)}${f('LinkedIn','ct_link',p.linkedin)}
     ${f('Note','ct_notes',p.notes,'textarea')}</div>`,async()=>{
     const o={first_name:gv('ct_fn'),last_name:gv('ct_ln'),company:gv('ct_co'),role_title:gv('ct_title'),authority:gv('ct_auth'),email:gv('ct_email'),phone:readPhone('ct_phone'),mobile:readPhone('ct_mobile'),linkedin:gv('ct_link'),notes:gv('ct_notes')};
-    if(!o.first_name||!o.last_name)throw new Error('Nome e cognome obbligatori');id?await store.update('contacts',id,o):await store.insert('contacts',o);if(typeof afterSave==='function')afterSave();});
+    if(!o.first_name||!o.last_name)throw new Error('Nome e cognome obbligatori');const rec=id?await store.update('contacts',id,o):await store.insert('contacts',o);if(typeof afterSave==='function')afterSave(rec);});
   }
 
 /* LEAD */
@@ -1590,6 +1590,18 @@ function onDocPartyChange(cid){
   sel.innerHTML='<option value="">— seleziona —</option>'+list.map(x=>`<option value="${x.id}">${esc(x.first_name+' '+x.last_name)}</option>`).join('');
   sel.value=(cur&&list.some(x=>x.id===cur))?cur:'';
 }
+async function newDocContact(){
+  const ps=document.getElementById('dc_party');const cid=ps?ps.value:'';
+  if(!cid){alert('Seleziona prima il cliente: il nuovo contatto verrà associato a quell\'azienda.');return;}
+  await editContact(null,cid,async(rec)=>{
+    DOC_CONTACTS=await store.list('contacts');
+    const coId=(rec&&rec.company)?rec.company:cid;
+    if(ps&&coId&&[...ps.options].some(o=>o.value===coId))ps.value=coId;
+    onDocPartyChange(coId);
+    const sel=document.getElementById('dc_ct');
+    if(sel&&rec&&rec.id)sel.value=rec.id;
+  });
+}
 async function docForm(kind,id){
   const cfg=DOC_CFG[kind];const s=await store.settings();CUR=s.currency||'CHF';
   const doc=id?await store.get(cfg.table,id):{currency:s.currency,status:cfg.statuses[0],date:todayISO(),lines:[],documents:[],number:await nextNumber(kind),payment_terms:'30 giorni data fattura'};
@@ -1614,7 +1626,7 @@ async function docForm(kind,id){
     <div class="doc-cards">
       <div class="dcard"><h4>${esc(cfg.partyLabel)}</h4>
         <div class="field"><label>${esc(cfg.partyLabel)} *</label><div style="display:flex;gap:6px"><select id="dc_party" onchange="onDocPartyChange(this.value)" style="flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff"><option value="">\u2014</option>${partyOpts.map(o=>`<option value="${o.id}" ${o.id===doc[partyField]?'selected':''}>${esc(o.label)}</option>`).join('')}</select><button class="btn ghost sm" type="button" onclick="newPartyCompany(${cfg.supplier?'true':'false'})">+ Nuova</button></div></div>
-        ${!cfg.supplier?f('Riferimento (contatto)','dc_ct',doc.contact,'ref',conOpts):''}
+        ${!cfg.supplier?`<div class="field"><label>Riferimento (contatto)</label><div style="display:flex;gap:6px"><select id="dc_ct" style="flex:1;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff"><option value="">\u2014 seleziona \u2014</option>${conOpts.map(o=>`<option value="${o.id}" ${o.id===doc.contact?'selected':''}>${esc(o.label)}</option>`).join('')}</select><button class="btn ghost sm" type="button" onclick="newDocContact()">+ Nuovo</button></div></div>`:''}
       </div>
       <div class="dcard"><h4>Dati documento</h4><div class="fgrid">
         ${f('Data','dc_date',doc.date,'date')}${f('Numero','dc_num',doc.number)}
