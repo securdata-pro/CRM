@@ -1,12 +1,15 @@
 /* SecurGest — service worker (offline + caricamento veloce)
    Da caricare nella STESSA cartella di index.html sul repo GitHub.
    Per forzare un aggiornamento dopo modifiche importanti: cambia il numero di versione qui sotto (es. v1 -> v2). */
-const CACHE = 'securgest-v1';
+const CACHE = 'securgest-v2';
 
 // Risorse da mettere in cache all'installazione (la "shell" dell'app)
 const PRECACHE = [
   './',
   './index.html',
+  './manifest.webmanifest',
+  './icon-192.png',
+  './icon-512.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
@@ -49,7 +52,7 @@ self.addEventListener('fetch', (e) => {
         cache.put('./index.html', net.clone());
         return net;
       } catch (err) {
-        return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+        return (await caches.match(req)) || (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
       }
     })());
     return;
